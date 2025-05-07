@@ -1,3 +1,4 @@
+/* Reset */
 .App {
   text-align: center;
 }
@@ -35,4 +36,17 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Additional custom styles */
+.page-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
+}
+
+.section-heading {
+  @apply text-3xl font-bold text-gray-900 mb-6;
+}
+
+.section-subheading {
+  @apply text-xl font-semibold text-gray-700 mb-4;
 }
