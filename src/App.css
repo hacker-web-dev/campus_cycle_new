@@ -1,11 +1,17 @@
 /* Reset */
 .App {
   text-align: center;
+  animation: fadeIn 1s ease-in-out;
 }
 
 .App-logo {
   height: 40vmin;
   pointer-events: none;
+  transition: transform 0.3s ease-in-out;
+}
+
+.App-logo:hover {
+  transform: scale(1.1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -23,10 +29,16 @@
   justify-content: center;
   font-size: calc(10px + 2vmin);
   color: white;
+  animation: fadeIn 1s ease-in-out;
 }
 
 .App-link {
   color: #61dafb;
+  transition: color 0.3s ease-in-out;
+}
+
+.App-link:hover {
+  color: #21a1f1;
 }
 
 @keyframes App-logo-spin {
@@ -41,12 +53,23 @@
 /* Additional custom styles */
 .page-container {
   @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
+  animation: slideIn 0.5s ease-in-out;
 }
 
 .section-heading {
   @apply text-3xl font-bold text-gray-900 mb-6;
+  transition: color 0.3s ease-in-out;
+}
+
+.section-heading:hover {
+  color: #4a90e2;
 }
 
 .section-subheading {
   @apply text-xl font-semibold text-gray-700 mb-4;
+  transition: color 0.3s ease-in-out;
+}
+
+.section-subheading:hover {
+  color: #7b8cde;
 }
