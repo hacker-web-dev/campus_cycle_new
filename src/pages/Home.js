@@ -1,8 +1,79 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaExchangeAlt, FaUserGraduate, FaRecycle, FaHandshake } from 'react-icons/fa';
+import ApiService from '../services/api';
+import SmartRecommendations from '../components/SmartRecommendations';
 
-const Home = () => {
+const Home = ({ isAuthenticated, user }) => {
+  const [featuredItems, setFeaturedItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userStats, setUserStats] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch featured items
+        const items = await ApiService.getItems({ sortBy: 'newest' });
+        setFeaturedItems(items.slice(0, 4));
+
+        // Fetch user stats if authenticated
+        if (isAuthenticated) {
+          try {
+            const stats = await ApiService.getUserProfile();
+            setUserStats(stats);
+          } catch (error) {
+            console.error('Error fetching user stats:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching featured items:', error);
+        // Fallback to static data
+        setFeaturedItems([
+          {
+            _id: 1,
+            title: "Engineering Textbook Bundle",
+            price: 85,
+            images: ["https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80"],
+            condition: "Good",
+            location: "Engineering Building",
+            seller: { name: "John D." }
+          },
+          {
+            _id: 2,
+            title: "Desk Lamp - Adjustable",
+            price: 15,
+            images: ["https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&q=80"],
+            condition: "Like New",
+            location: "North Campus",
+            seller: { name: "Sarah M." }
+          },
+          {
+            _id: 3,
+            title: "Laptop Stand - Aluminum",
+            price: 25,
+            images: ["https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&q=80"],
+            condition: "New",
+            location: "Computer Science Building",
+            seller: { name: "Alex T." }
+          },
+          {
+            _id: 4,
+            title: "Bookshelf - 3 Tier",
+            price: 40,
+            images: ["https://images.unsplash.com/photo-1594620302200-9a762244a156?auto=format&fit=crop&q=80"],
+            condition: "Good",
+            location: "West Dorms",
+            seller: { name: "Emma L." }
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [isAuthenticated]);
+
   const categories = [
     { name: "Textbooks", image: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80" },
     { name: "Electronics", image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&q=80" },
@@ -10,45 +81,6 @@ const Home = () => {
     { name: "Clothing", image: "https://images.unsplash.com/photo-1523381294911-8d3cead13475?auto=format&fit=crop&q=80" },
     { name: "Appliances", image: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&q=80" },
     { name: "Sports Equipment", image: "https://images.unsplash.com/photo-1599058917765-a780eda07a3e?auto=format&fit=crop&q=80" },
-  ];
-
-  const featuredItems = [
-    {
-      id: 1,
-      title: "Engineering Textbook Bundle",
-      price: 85,
-      image: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80",
-      condition: "Good",
-      location: "Engineering Building",
-      seller: "John D."
-    },
-    {
-      id: 2,
-      title: "Desk Lamp - Adjustable",
-      price: 15,
-      image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&q=80",
-      condition: "Like New",
-      location: "North Campus",
-      seller: "Sarah M."
-    },
-    {
-      id: 3,
-      title: "Laptop Stand - Aluminum",
-      price: 25,
-      image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&q=80",
-      condition: "New",
-      location: "Computer Science Building",
-      seller: "Alex T."
-    },
-    {
-      id: 4,
-      title: "Bookshelf - 3 Tier",
-      price: 40,
-      image: "https://images.unsplash.com/photo-1594620302200-9a762244a156?auto=format&fit=crop&q=80",
-      condition: "Good",
-      location: "West Dorms",
-      seller: "Emma L."
-    }
   ];
 
   return (
@@ -63,27 +95,60 @@ const Home = () => {
           />
         </div>
         <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Sustainable Shopping for Students
-          </h1>
-          <p className="mt-6 max-w-2xl text-xl text-gray-300">
-            Buy and sell used textbooks, furniture, electronics, and more within your campus community.
-            Save money while reducing waste.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
-            <Link
-              to="/browse"
-              className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-            >
-              Browse Items
-            </Link>
-            <Link
-              to="/register"
-              className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-700 bg-white hover:bg-gray-100"
-            >
-              Sign Up Now
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <>
+              <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                Welcome back, {user?.name?.split(' ')[0] || 'Student'}!
+              </h1>
+              <p className="mt-6 max-w-2xl text-xl text-gray-300">
+                Ready to find great deals or sell your items? Your campus marketplace awaits.
+              </p>
+              <div className="mt-10 flex flex-col sm:flex-row gap-4">
+                <Link
+                  to="/browse"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  Browse Items
+                </Link>
+                <Link
+                  to="/sell"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-700 bg-white hover:bg-gray-100"
+                >
+                  List an Item
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-white text-base font-medium rounded-md text-white hover:bg-white hover:text-primary-700"
+                >
+                  My Dashboard
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                Sustainable Shopping for Students
+              </h1>
+              <p className="mt-6 max-w-2xl text-xl text-gray-300">
+                Buy and sell used textbooks, furniture, electronics, and more within your campus community.
+                Save money while reducing waste.
+              </p>
+              <div className="mt-10 flex flex-col sm:flex-row gap-4">
+                <Link
+                  to="/browse"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  Browse Items
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-700 bg-white hover:bg-gray-100"
+                >
+                  Sign Up Now
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -193,33 +258,43 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredItems.map((item) => (
-              <div key={item.id} className="card transition-transform duration-300 hover:scale-105 hover:shadow-xl">
-                <Link to={`/product/${item.id}`}>
-                  <div className="relative h-56">
-                    <img
-                      className="w-full h-full object-cover"
-                      src={item.image}
-                      alt={item.title}
-                    />
-                    <div className="absolute top-0 right-0 m-2 px-2 py-1 bg-primary-500 rounded text-xs font-bold text-white">
-                      {item.condition}
+          {loading ? (
+            <div className="mt-10 flex justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : (
+            <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {featuredItems.map((item) => (
+                <div key={item._id} className="card transition-transform duration-300 hover:scale-105 hover:shadow-xl">
+                  <Link to={`/product/${item._id}`}>
+                    <div className="relative h-56">
+                      <img
+                        className="w-full h-full object-cover"
+                        src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/300x200?text=No+Image'}
+                        alt={item.title}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                        }}
+                      />
+                      <div className="absolute top-0 right-0 m-2 px-2 py-1 bg-primary-500 rounded text-xs font-bold text-white">
+                        {item.condition}
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">{item.title}</h3>
-                    <p className="mt-1 text-xl font-bold text-primary-600">${item.price}</p>
-                    <div className="mt-2 flex items-center text-sm text-gray-500">
-                      <span>{item.location}</span>
-                      <span className="mx-1">•</span>
-                      <span>Seller: {item.seller}</span>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{item.title}</h3>
+                      <p className="mt-1 text-xl font-bold text-primary-600">${item.price}</p>
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <span>{item.location}</span>
+                        <span className="mx-1">•</span>
+                        <span>Seller: {item.seller?.name || 'Unknown'}</span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-10 text-center">
             <Link
@@ -231,6 +306,15 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Smart Recommendations Section */}
+      {isAuthenticated && user && (
+        <div className="bg-gray-50 py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <SmartRecommendations user={user} />
+          </div>
+        </div>
+      )}
 
       {/* How It Works Section */}
       <div className="bg-gray-50 py-12">
@@ -279,28 +363,57 @@ const Home = () => {
       {/* CTA Section */}
       <div className="bg-primary-700">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
-          <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            <span className="block">Ready to start?</span>
-            <span className="block">Join Campus Cycle today.</span>
-          </h2>
-          <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
-            <div className="inline-flex rounded-md shadow">
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-gray-50"
-              >
-                Sign Up
-              </Link>
-            </div>
-            <div className="ml-3 inline-flex rounded-md shadow">
-              <Link
-                to="/browse"
-                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
-              >
-                Browse Items
-              </Link>
-            </div>
-          </div>
+          {isAuthenticated ? (
+            <>
+              <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                <span className="block">Ready to make your next trade?</span>
+                <span className="block">Start buying or selling today.</span>
+              </h2>
+              <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
+                <div className="inline-flex rounded-md shadow">
+                  <Link
+                    to="/sell"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-gray-50"
+                  >
+                    List an Item
+                  </Link>
+                </div>
+                <div className="ml-3 inline-flex rounded-md shadow">
+                  <Link
+                    to="/browse"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
+                  >
+                    Browse Items
+                  </Link>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                <span className="block">Ready to start?</span>
+                <span className="block">Join Campus Cycle today.</span>
+              </h2>
+              <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
+                <div className="inline-flex rounded-md shadow">
+                  <Link
+                    to="/register"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-gray-50"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+                <div className="ml-3 inline-flex rounded-md shadow">
+                  <Link
+                    to="/browse"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
+                  >
+                    Browse Items
+                  </Link>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

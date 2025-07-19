@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUser, FaEnvelope, FaLock, FaUniversity, FaGoogle, FaMicrosoft, FaEye, FaEyeSlash, FaCheckCircle } from 'react-icons/fa';
+import ApiService from '../services/api';
 
 const Register = ({ login, isAuthenticated }) => {
   const navigate = useNavigate();
@@ -84,8 +85,6 @@ const Register = ({ login, isAuthenticated }) => {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
-    } else if (!formData.email.endsWith('.edu')) {
-      newErrors.email = 'Please use your university email (.edu)';
     }
     
     // Validate university
@@ -130,20 +129,33 @@ const Register = ({ login, isAuthenticated }) => {
     setIsLoading(true);
     
     try {
-      // Simulate API registration request with visual feedback
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const registrationData = {
+        name: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        university: formData.university
+      };
+
+      const response = await ApiService.register(registrationData);
       
-      // In a real app, you would call your registration API here
+      // Set the auth token
+      ApiService.setAuthToken(response.token);
+      
+      // Store user data
+      localStorage.setItem('campus_cycle_user', JSON.stringify(response.user));
       
       // Call login function from props to update authentication state
-      login();
-      
+      login(response.user);
+
+      // Show success message
+      alert('Registration successful! Welcome to Campus Cycle!');
+
       // Redirect to dashboard after successful registration
       navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
       setErrors({
-        form: 'Registration failed. Please try again later.'
+        form: error.message || 'Registration failed. Please try again.'
       });
     } finally {
       setIsLoading(false);
@@ -152,13 +164,14 @@ const Register = ({ login, isAuthenticated }) => {
 
   const handleSSOLogin = (provider) => {
     setIsLoading(true);
-    
-    // Simulate SSO login with visual feedback
+    // TODO: Implement actual SSO integration
     setTimeout(() => {
-      // In a real app, this would redirect to the provider's oauth page
-      login();
-      navigate('/dashboard');
-    }, 1500);
+      setIsLoading(false);
+      // For now, show that SSO is not yet implemented
+      setErrors({
+        form: `${provider} sign-up will be available soon.`
+      });
+    }, 1000);
   };
 
   // Password strength indicator label

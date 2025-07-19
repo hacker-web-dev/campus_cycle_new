@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaLock, FaGoogle, FaMicrosoft, FaEye, FaEyeSlash } from 'react-icons/fa';
+import ApiService from '../services/api';
 
 const Login = ({ login, isAuthenticated }) => {
   const navigate = useNavigate();
@@ -81,20 +82,25 @@ const Login = ({ login, isAuthenticated }) => {
     setIsLoading(true);
 
     try {
-      // Simulate API login request
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const credentials = {
+        email: formData.email,
+        password: formData.password
+      };
 
-      // In a real app, you would call your authentication API here
-
+      const response = await ApiService.login(credentials);
+      
+      // Set the auth token
+      ApiService.setAuthToken(response.token);
+      
       // Call login function from props to update authentication state
-      login();
+      login(response.user);
 
       // Redirect to dashboard after successful login
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       setErrors({
-        form: 'Login failed. Please check your credentials and try again.'
+        form: error.message || 'Login failed. Please check your credentials and try again.'
       });
     } finally {
       setIsLoading(false);
@@ -103,13 +109,13 @@ const Login = ({ login, isAuthenticated }) => {
 
   const handleSSOLogin = (provider) => {
     setIsLoading(true);
-
-    // Simulate SSO login
+    // TODO: Implement actual SSO integration
     setTimeout(() => {
-      // In a real app, this would redirect to the provider's oauth page
-      login();
-      navigate('/dashboard');
-    }, 1500);
+      setIsLoading(false);
+      setErrors({
+        form: `${provider} sign-in will be available soon.`
+      });
+    }, 1000);
   };
 
   return (

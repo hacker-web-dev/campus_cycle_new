@@ -1,258 +1,400 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { FaPlus, FaBoxOpen, FaHeart, FaCommentDots, FaChartLine } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FaPlus, FaBoxOpen, FaHeart, FaShoppingBag, FaChartLine, FaEdit, FaTrash, FaEye, FaDollarSign, FaUsers, FaFire, FaClock, FaArrowUp, FaArrowDown, FaCopy } from 'react-icons/fa';
+import ApiService from '../services/api';
 
-const Dashboard = () => {
-  // Mock user data
-  const user = {
-    name: 'Alex Johnson',
-    email: 'alex@university.edu',
-    joinDate: 'August 2022',
-    profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=128&h=128&q=80'
-  };
+const Dashboard = ({ user }) => {
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({});
+  const [recentActivity, setRecentActivity] = useState({});
+  const [trendingItems, setTrendingItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // Mock stats data
-  const stats = {
-    activeListings: 4,
-    soldItems: 7,
-    savedItems: 12,
-    messagesUnread: 3
-  };
-
-  // Mock listings data
-  const listings = [
-    {
-      id: 1,
-      title: 'Computer Science Textbook',
-      price: 45,
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80',
-      status: 'active',
-      views: 24,
-      savedBy: 3,
-      date: '2 days ago'
-    },
-    {
-      id: 2,
-      title: 'Desk Lamp - Adjustable',
-      price: 15,
-      image: 'https://images.unsplash.com/photo-1534025644911-6f8834e29c8f?auto=format&fit=crop&q=80',
-      status: 'active',
-      views: 18,
-      savedBy: 1,
-      date: '5 days ago'
-    },
-    {
-      id: 3,
-      title: 'Wireless Headphones',
-      price: 50,
-      image: 'https://images.unsplash.com/photo-1546435770-a3e0e7a3f35d?auto=format&fit=crop&q=80',
-      status: 'active',
-      views: 32,
-      savedBy: 5,
-      date: '1 week ago'
-    },
-    {
-      id: 4,
-      title: 'Dorm Room Bookshelf',
-      price: 30,
-      image: 'https://images.unsplash.com/photo-1588279102040-6a397a7a4262?auto=format&fit=crop&q=80',
-      status: 'active',
-      views: 11,
-      savedBy: 0,
-      date: '1 week ago'
+  useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem('campus_cycle_token');
+    if (!token) {
+      navigate('/login');
+      return;
     }
-  ];
+
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all dashboard data in parallel
+        const [statsData, activityData, trending] = await Promise.all([
+          ApiService.getUserStats(),
+          ApiService.getRecentActivity(5),
+          ApiService.getTrendingItems(6)
+        ]);
+        
+        setStats(statsData || {});
+        setRecentActivity(activityData || {});
+        setTrendingItems(trending || []);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [navigate]);
+
+  const copyPinToClipboard = async (pin) => {
+    try {
+      await navigator.clipboard.writeText(pin);
+      alert('PIN copied to clipboard!');
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = pin;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        alert('PIN copied to clipboard!');
+      } catch (err) {
+        alert('Failed to copy PIN');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const StatCard = ({ title, value, change, icon, color, link }) => (
+    <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          {change && (
+            <p className={`text-sm flex items-center ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {change >= 0 ? <FaArrowUp className="mr-1" /> : <FaArrowDown className="mr-1" />}
+              {Math.abs(change)}%
+            </p>
+          )}
+        </div>
+        <div className={`p-3 rounded-lg ${color}`}>
+          {icon}
+        </div>
+      </div>
+      {link && (
+        <Link to={link} className="text-primary-600 hover:text-primary-500 text-sm font-medium mt-2 inline-block">
+          View details →
+        </Link>
+      )}
+    </div>
+  );
+
+  const ActivityItem = ({ type, item, date, buyer, seller, quantity, totalAmount, verificationPin }) => (
+    <div className="p-3 hover:bg-gray-50 rounded-lg">
+      <div className="flex items-center space-x-3">
+        <div className={`p-2 rounded-lg ${
+          type === 'listing' ? 'bg-blue-100' : 
+          type === 'sale' ? 'bg-green-100' : 'bg-purple-100'
+        }`}>
+          {type === 'listing' ? <FaPlus className="text-blue-600" /> :
+           type === 'sale' ? <FaDollarSign className="text-green-600" /> :
+           <FaShoppingBag className="text-purple-600" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {type === 'listing' ? `Listed "${item?.title}"` :
+             type === 'sale' ? `Sold "${item?.title}"${buyer ? ` to ${buyer}` : ''}${quantity > 1 ? ` (${quantity}x)` : ''}` :
+             `Purchased "${item?.title}"${seller ? ` from ${seller}` : ''}${quantity > 1 ? ` (${quantity}x)` : ''}`}
+          </p>
+          <p className="text-sm text-gray-500">
+            {new Date(date).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="text-sm font-medium text-gray-900">
+          ${totalAmount || (item?.price * (quantity || 1)).toFixed(2)}
+        </div>
+      </div>
+      {type === 'purchase' && verificationPin && (
+        <div className="mt-2 ml-12 p-2 bg-blue-50 rounded border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Verification PIN:</p>
+              <p className="font-mono font-bold text-blue-600">{verificationPin}</p>
+            </div>
+            <button
+              onClick={() => copyPinToClipboard(verificationPin)}
+              className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+              title="Copy PIN"
+            >
+              <FaCopy className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        
-        {/* Stats cards */}
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FaBoxOpen className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Active Listings</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">{stats.activeListings}</div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <Link to="/listings" className="font-medium text-primary-600 hover:text-primary-500">View all</Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FaChartLine className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Sold Items</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">{stats.soldItems}</div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <Link to="/sales" className="font-medium text-primary-600 hover:text-primary-500">View history</Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FaHeart className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Saved Items</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">{stats.savedItems}</div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <Link to="/saved" className="font-medium text-primary-600 hover:text-primary-500">View all</Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FaCommentDots className="h-6 w-6 text-gray-400" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Messages</dt>
-                    <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {stats.messagesUnread > 0 ? (
-                          <span className="flex items-center">
-                            {stats.messagesUnread}
-                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              New
-                            </span>
-                          </span>
-                        ) : '0'}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3">
-              <div className="text-sm">
-                <Link to="/messages" className="font-medium text-primary-600 hover:text-primary-500">View all</Link>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user?.name?.split(' ')[0] || 'Student'}!
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Here's what's happening with your Campus Cycle activity
+          </p>
         </div>
 
-        {/* Your listings section */}
-        <div className="mt-8">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Your Listings</h2>
-            <Link 
-              to="/create-listing" 
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <FaPlus className="-ml-1 mr-2 h-4 w-4" />
-              Add New Listing
-            </Link>
-          </div>
+        {/* Quick Actions */}
+        <div className="mb-8 flex flex-wrap gap-3">
+          <Link
+            to="/sell"
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-200"
+          >
+            <FaPlus className="mr-2" />
+            List New Item
+          </Link>
+          <Link
+            to="/browse"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+          >
+            <FaEye className="mr-2" />
+            Browse Items
+          </Link>
+          <Link
+            to="/my-listings"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+          >
+            <FaBoxOpen className="mr-2" />
+            My Listings
+          </Link>
+        </div>
 
-          <div className="mt-4 bg-white shadow overflow-hidden sm:rounded-md">
-            <ul className="divide-y divide-gray-200">
-              {listings.map((listing) => (
-                <li key={listing.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-16 w-16 bg-gray-100 rounded-md overflow-hidden">
+        {/* Navigation Tabs */}
+        <div className="mb-6">
+          <nav className="flex space-x-8" aria-label="Tabs">
+            {[
+              { id: 'overview', name: 'Overview', icon: <FaChartLine /> },
+              { id: 'activity', name: 'Recent Activity', icon: <FaClock /> },
+              { id: 'trending', name: 'Trending', icon: <FaFire /> }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors duration-200`}
+              >
+                {tab.icon}
+                <span>{tab.name}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard
+                title="Active Listings"
+                value={stats.activeItems || 0}
+                icon={<FaBoxOpen className="h-6 w-6 text-white" />}
+                color="bg-blue-500"
+                link="/my-listings"
+              />
+              <StatCard
+                title="Items Sold"
+                value={stats.soldItems || 0}
+                icon={<FaShoppingBag className="h-6 w-6 text-white" />}
+                color="bg-green-500"
+              />
+              <StatCard
+                title="Total Earnings"
+                value={`$${stats.totalEarnings || 0}`}
+                icon={<FaDollarSign className="h-6 w-6 text-white" />}
+                color="bg-purple-500"
+                link="/sales"
+              />
+              <StatCard
+                title="Profile Views"
+                value={stats.totalViews || 0}
+                icon={<FaEye className="h-6 w-6 text-white" />}
+                color="bg-orange-500"
+              />
+              <StatCard
+                title="Favorites"
+                value={stats.favorites || 0}
+                icon={<FaHeart className="h-6 w-6 text-white" />}
+                color="bg-red-500"
+                link="/favorites"
+              />
+              <StatCard
+                title="Purchases"
+                value={stats.purchases || 0}
+                icon={<FaShoppingBag className="h-6 w-6 text-white" />}
+                color="bg-indigo-500"
+                link="/purchases"
+              />
+              <StatCard
+                title="Average Price"
+                value={`$${Math.round(stats.averagePrice || 0)}`}
+                icon={<FaChartLine className="h-6 w-6 text-white" />}
+                color="bg-yellow-500"
+              />
+              <StatCard
+                title="Total Items"
+                value={stats.totalItems || 0}
+                icon={<FaUsers className="h-6 w-6 text-white" />}
+                color="bg-teal-500"
+              />
+            </div>
+
+            {/* Performance Chart Placeholder */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Your Performance</h3>
+              <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+                <div className="text-center">
+                  <FaChartLine className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">Performance analytics coming soon</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Listings */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Listings</h3>
+                <div className="space-y-2">
+                  {recentActivity.recentItems?.length > 0 ? (
+                    recentActivity.recentItems.map((item) => (
+                      <ActivityItem
+                        key={`listing-${item._id}`}
+                        type="listing"
+                        item={item}
+                        date={item.createdAt}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">No recent listings</p>
+                  )}
+                </div>
+                <Link to="/my-listings" className="text-primary-600 hover:text-primary-500 text-sm font-medium mt-4 inline-block">
+                  View all listings →
+                </Link>
+              </div>
+
+              {/* Recent Sales */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Sales</h3>
+                <div className="space-y-2">
+                  {recentActivity.recentSales?.length > 0 ? (
+                    recentActivity.recentSales.map((sale) => (
+                      <div key={`sale-${sale._id}`} className="space-y-2">
+                        {sale.items.map((orderItem, index) => (
+                          <ActivityItem
+                            key={`sale-${sale._id}-${index}`}
+                            type="sale"
+                            item={orderItem.item}
+                            date={sale.createdAt}
+                            buyer={sale.buyer?.name}
+                            quantity={orderItem.quantity}
+                            totalAmount={sale.totalAmount}
+                          />
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">No recent sales</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Purchases */}
+              <div className="bg-white rounded-lg shadow-sm p-6 lg:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Purchases</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {recentActivity.recentPurchases?.length > 0 ? (
+                    recentActivity.recentPurchases.map((purchase) => (
+                      <div key={`purchase-${purchase._id}`} className="space-y-2">
+                        {purchase.items.map((orderItem, index) => (
+                          <ActivityItem
+                            key={`purchase-${purchase._id}-${index}`}
+                            type="purchase"
+                            item={orderItem.item}
+                            date={purchase.createdAt}
+                            seller={purchase.seller?.name}
+                            quantity={orderItem.quantity}
+                            totalAmount={purchase.totalAmount}
+                            verificationPin={purchase.verificationPin}
+                          />
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4 md:col-span-2">No recent purchases</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'trending' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Trending Items on Campus</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {trendingItems.map((item) => (
+                  <div key={item._id} className="group">
+                    <Link to={`/product/${item._id}`} className="block">
+                      <div className="relative h-48 rounded-lg overflow-hidden mb-3">
                         <img
-                          src={listing.image}
-                          alt={listing.title}
-                          className="h-full w-full object-cover"
+                          src={item.images?.[0] ? item.images[0] : 'https://via.placeholder.com/300x200?text=No+Image'}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                          }}
                         />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-primary-600 truncate">
-                            <Link to={`/product/${listing.id}`}>{listing.title}</Link>
-                          </p>
-                          <div className="ml-2 flex-shrink-0 flex">
-                            <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              listing.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {listing.status === 'active' ? 'Active' : 'Pending'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-1 flex flex-col sm:flex-row sm:justify-between">
-                          <div>
-                            <p className="text-lg font-semibold text-gray-900">
-                              ${listing.price}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">
-                              Listed {listing.date}
-                            </p>
-                          </div>
-                          <div className="mt-2 sm:mt-0 flex sm:items-end flex-col text-sm text-gray-500">
-                            <p>{listing.views} views</p>
-                            <p>{listing.savedBy} {listing.savedBy === 1 ? 'person' : 'people'} saved</p>
-                          </div>
+                        <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center">
+                          <FaFire className="mr-1" />
+                          {item.views || 0}
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-4 flex justify-end space-x-3">
-                      <Link 
-                        to={`/edit-listing/${listing.id}`}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        type="button"
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        Mark as Sold
-                      </button>
-                    </div>
+                      <h4 className="font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
+                        {item.title}
+                      </h4>
+                      <p className="text-primary-600 font-bold">${item.price}</p>
+                      <p className="text-sm text-gray-500">{item.category}</p>
+                    </Link>
                   </div>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+              {trendingItems.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No trending items available</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

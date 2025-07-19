@@ -1,95 +1,154 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FaArrowLeft, FaUser, FaStar, FaRegStar, FaMapMarkerAlt, FaClock, FaTag, FaHeart, FaRegHeart, FaShieldAlt, FaExchangeAlt, FaCheck } from 'react-icons/fa';
+import { FaArrowLeft, FaUser, FaStar, FaRegStar, FaMapMarkerAlt, FaClock, FaTag, FaHeart, FaRegHeart, FaShieldAlt, FaExchangeAlt, FaCheck, FaShoppingCart, FaComments } from 'react-icons/fa';
+import ApiService from '../services/api';
+import ReviewsRatings from '../components/ReviewsRatings';
 
-const ProductDetails = () => {
+const ProductDetails = ({ user }) => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [sellerRating] = useState(4.7);
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   useEffect(() => {
-    // Simulate API fetch
     const fetchProductDetails = async () => {
       setLoading(true);
-      // In a real app, this would be an API call
-      setTimeout(() => {
-        // Mock product data
-        const mockProduct = {
-          id: parseInt(id),
-          title: "MacBook Pro 13\" (2020)",
-          price: 850,
-          description: "2020 MacBook Pro in excellent condition. 8GB RAM, 256GB SSD, Intel Core i5 processor. Includes charger and laptop sleeve. Battery health at 92%. Perfect for students and light programming. Minor wear on the bottom case, but otherwise like new. Originally purchased in August 2020.",
-          condition: "Like New",
-          category: "Electronics",
-          location: "Computer Science Building",
-          seller: {
-            name: "Alex Johnson",
-            joinDate: "Aug 2022",
-            responseRate: "95%",
-            averageResponseTime: "Within 1 hour"
-          },
-          postedDate: "2 days ago",
-          images: [
-            "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1420406676079-b8491f2d07c8?auto=format&fit=crop&q=80",
-            "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?auto=format&fit=crop&q=80"
-          ],
-          features: [
-            "8GB RAM",
-            "256GB SSD",
-            "Intel Core i5",
-            "13-inch Retina Display",
-            "Two Thunderbolt 3 ports"
-          ],
-          additionalInfo: "This laptop was primarily used for coursework and web browsing. It's in excellent condition with no issues. I'm selling because I recently upgraded to a newer model."
-        };
-
-        // Mock related products
-        const mockRelatedProducts = [
-          {
-            id: 10,
-            title: "iPad Pro 11\" (2021)",
-            price: 650,
-            image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&q=80",
-            condition: "Good"
-          },
-          {
-            id: 11,
-            title: "Wireless Keyboard & Mouse",
-            price: 45,
-            image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&q=80",
-            condition: "New"
-          },
-          {
-            id: 12,
-            title: "Laptop Stand - Aluminum",
-            price: 25,
-            image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&q=80",
-            condition: "Like New"
-          }
-        ];
-
-        setProduct(mockProduct);
-        setRelatedProducts(mockRelatedProducts);
+      setError(null);
+      try {
+        const productData = await ApiService.getItemById(id);
+        setProduct(productData);
+        
+        // Check if item is in user's favorites
+        if (user && productData.savedBy) {
+          setIsFavorite(productData.savedBy.includes(user.id));
+        }
+        
+        // Fetch related products (same category, different item)
+        const relatedData = await ApiService.getItems({ 
+          category: productData.category,
+          limit: 4 
+        });
+        const related = relatedData.filter(item => item._id !== productData._id).slice(0, 3);
+        setRelatedProducts(related);
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        setError('Product not found or server error');
+      } finally {
         setLoading(false);
-      }, 800);
+      }
     };
 
-    fetchProductDetails();
+    if (id) {
+      fetchProductDetails();
+    }
 
-    // Reset to top of page when component loads
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [id, user]);
 
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    // In a real app, this would make an API call to update the user's favorites
+  const toggleFavorite = async () => {
+    if (!user) {
+      alert('Please login to add items to favorites');
+      return;
+    }
+
+    try {
+      setFavoriteLoading(true);
+      const response = await ApiService.toggleFavorite(id);
+      setIsFavorite(response.isFavorited);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Error updating favorites. Please try again.');
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!user) {
+      alert('Please login to make a purchase');
+      return;
+    }
+
+    if (product.seller._id === user.id) {
+      alert('You cannot buy your own item');
+      return;
+    }
+
+    try {
+      setPurchaseLoading(true);
+      
+      // For demo purposes, we'll use dummy shipping info
+      const orderData = {
+        itemId: product._id,
+        shippingAddress: {
+          name: user.name,
+          address: '123 Campus Street',
+          city: 'University City',
+          zipCode: '12345',
+          phone: user.phone || '555-0123'
+        }
+      };
+
+      await ApiService.createOrder(orderData);
+      alert('Purchase successful! The item has been added to your orders.');
+      
+      // Refresh product details to show updated status
+      const updatedProduct = await ApiService.getItemById(id);
+      setProduct(updatedProduct);
+    } catch (error) {
+      console.error('Error making purchase:', error);
+      alert(error.message || 'Error processing purchase. Please try again.');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!user) {
+      alert('Please login to add items to cart');
+      return;
+    }
+
+    if (product.seller._id === user.id) {
+      alert('You cannot add your own item to cart');
+      return;
+    }
+
+    try {
+      await ApiService.addToCart(product._id, 1);
+      alert('Item added to cart!');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      alert(error.message || 'Error adding item to cart');
+    }
+  };
+
+  const handleMessageSeller = async () => {
+    if (!user) {
+      alert('Please login to message the seller');
+      return;
+    }
+
+    if (product.seller._id === user.id) {
+      alert('You cannot message yourself');
+      return;
+    }
+
+    try {
+      const initialMessage = `Hi! I'm interested in your item "${product.title}". Is it still available?`;
+      await ApiService.sendMessage(product.seller._id, initialMessage);
+      alert('Message sent to seller! Check your messages for their reply.');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert(error.message || 'Error sending message to seller');
+    }
   };
 
   if (loading) {
@@ -97,6 +156,21 @@ const ProductDetails = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-center items-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">Product Not Found</h2>
+          <p className="mt-2 text-gray-600">{error || 'This product may have been removed or sold.'}</p>
+          <Link to="/browse" className="mt-4 inline-flex items-center text-primary-600 hover:text-primary-700">
+            <FaArrowLeft className="mr-2" />
+            Back to Browse
+          </Link>
         </div>
       </div>
     );
@@ -143,9 +217,16 @@ const ProductDetails = () => {
             <div className="bg-white rounded-lg overflow-hidden shadow-sm mb-4">
               <div className="relative pb-[75%]">
                 <img
-                  src={product.images[activeImageIndex]}
+                  src={product.images?.[activeImageIndex] ? 
+                    (product.images[activeImageIndex].startsWith('http') ? product.images[activeImageIndex] : `http://localhost:5000${product.images[activeImageIndex]}`) :
+                    product.images?.[0] ? 
+                      (product.images[0].startsWith('http') ? product.images[0] : `http://localhost:5000${product.images[0]}`) :
+                      'https://via.placeholder.com/600x400?text=No+Image'}
                   alt={product.title}
                   className="absolute h-full w-full object-cover"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/600x400?text=No+Image';
+                  }}
                 />
                 {/* Favorite button */}
                 <button
@@ -162,25 +243,30 @@ const ProductDetails = () => {
             </div>
             
             {/* Thumbnail images */}
-            <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image, index) => (
-                <div
-                  key={index}
-                  className={`cursor-pointer rounded-md overflow-hidden border-2 ${
-                    index === activeImageIndex ? 'border-primary-500' : 'border-transparent'
-                  }`}
-                  onClick={() => setActiveImageIndex(index)}
-                >
-                  <div className="relative pb-[75%]">
-                    <img
-                      src={image}
-                      alt={`${product.title} - view ${index + 1}`}
-                      className="absolute h-full w-full object-cover"
-                    />
+            {product.images && product.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {product.images.map((image, index) => (
+                  <div
+                    key={index}
+                    className={`cursor-pointer rounded-md overflow-hidden border-2 ${
+                      index === activeImageIndex ? 'border-primary-500' : 'border-transparent'
+                    }`}
+                    onClick={() => setActiveImageIndex(index)}
+                  >
+                    <div className="relative pb-[75%]">
+                      <img
+                        src={image.startsWith('http') ? image : `http://localhost:5000${image}`}
+                        alt={`${product.title} - view ${index + 1}`}
+                        className="absolute h-full w-full object-cover"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/150x150?text=No+Image';
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Details */}
@@ -206,8 +292,13 @@ const ProductDetails = () => {
                   </div>
                   <div className="flex items-center mt-2 sm:mt-0">
                     <FaClock className="mr-2 text-gray-400" />
-                    <span>Posted {product.postedDate}</span>
+                    <span>Posted {new Date(product.createdAt).toLocaleDateString()}</span>
                   </div>
+                </div>
+
+                {/* Views count */}
+                <div className="text-sm text-gray-500">
+                  {product.views} {product.views === 1 ? 'view' : 'views'}
                 </div>
 
                 {/* Category */}
@@ -258,40 +349,43 @@ const ProductDetails = () => {
                       <FaUser className="h-6 w-6 text-gray-600" />
                     </div>
                     <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">{product.seller.name}</h3>
+                      <h3 className="text-lg font-medium text-gray-900">{product.seller?.name || 'Unknown Seller'}</h3>
                       <div className="flex items-center mt-1">
-                        <div className="flex text-yellow-400">
-                          {[...Array(5)].map((_, i) => (
-                            i < Math.floor(sellerRating) ? (
-                              <FaStar key={i} className="h-4 w-4" />
-                            ) : i < sellerRating ? (
-                              <FaStar key={i} className="h-4 w-4 text-yellow-200" />
-                            ) : (
-                              <FaRegStar key={i} className="h-4 w-4" />
-                            )
-                          ))}
-                        </div>
-                        <span className="ml-2 text-sm text-gray-500">{sellerRating} • Member since {product.seller.joinDate}</span>
+                        <span className="text-sm text-gray-500">
+                          Member since {product.seller?.joinDate ? new Date(product.seller.joinDate).toLocaleDateString() : 'Unknown'}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <span className="font-medium">Response Rate:</span>
-                      <span className="ml-2">{product.seller.responseRate}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="font-medium">Typical Response:</span>
-                      <span className="ml-2">{product.seller.averageResponseTime}</span>
-                    </div>
-                  </div>
 
-                  {/* Contact Seller Button */}
-                  <div className="mt-6">
+                  {/* Action Buttons */}
+                  <div className="mt-6 space-y-3">
+                    {/* Add to Cart Button */}
+                    {user && product.seller._id !== user.id && product.status === 'active' && (
+                      <button 
+                        onClick={handleAddToCart}
+                        className="w-full bg-primary-600 py-3 px-4 rounded-md text-white font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center justify-center transition-colors duration-200"
+                      >
+                        <FaShoppingCart className="mr-2" />
+                        Add to Cart
+                      </button>
+                    )}
+                    
+                    {/* Message Seller Button */}
+                    {user && product.seller._id !== user.id && (
+                      <button 
+                        onClick={handleMessageSeller}
+                        className="w-full bg-green-600 py-3 px-4 rounded-md text-white font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <FaComments className="mr-2" />
+                        Message Seller
+                      </button>
+                    )}
+                    
+                    {/* Contact Seller Button */}
                     <button 
                       onClick={() => setShowContactInfo(!showContactInfo)}
-                      className="w-full bg-primary-600 py-3 px-4 rounded-md text-white font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full bg-gray-100 py-3 px-4 rounded-md text-gray-700 font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors duration-200"
                     >
                       {showContactInfo ? 'Hide Contact Info' : 'Contact Seller'}
                     </button>
@@ -299,9 +393,11 @@ const ProductDetails = () => {
                     {showContactInfo && (
                       <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
                         <p className="text-center text-gray-800">
-                          For demo purposes, contact info would be shown here.
+                          Email: {product.seller?.email || 'Not available'}
                           <br />
-                          In a real app, this would display email/phone or a messaging interface.
+                          <span className="text-sm text-gray-600">
+                            Contact the seller directly via email to arrange pickup.
+                          </span>
                         </p>
                       </div>
                     )}
@@ -331,19 +427,35 @@ const ProductDetails = () => {
           </div>
         </div>
 
+        {/* Seller Reviews Section */}
+        {product.seller && (
+          <div className="mt-12">
+            <ReviewsRatings 
+              userId={product.seller._id} 
+              userType="seller"
+              showAddReview={false}
+            />
+          </div>
+        )}
+
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">You might also like</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {relatedProducts.map((item) => (
-                <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden transition-transform duration-300 hover:shadow-md hover:-translate-y-1">
-                  <Link to={`/product/${item.id}`} className="block">
+                <div key={item._id} className="bg-white rounded-lg shadow-sm overflow-hidden transition-transform duration-300 hover:shadow-md hover:-translate-y-1">
+                  <Link to={`/product/${item._id}`} className="block">
                     <div className="relative h-48">
                       <img
-                        src={item.image}
+                        src={item.images?.[0] ? 
+                          (item.images[0].startsWith('http') ? item.images[0] : `http://localhost:5000${item.images[0]}`) : 
+                          'https://via.placeholder.com/300x200?text=No+Image'}
                         alt={item.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                        }}
                       />
                       <div className="absolute top-0 right-0 m-2 px-2 py-1 bg-primary-500 rounded text-xs font-bold text-white">
                         {item.condition}

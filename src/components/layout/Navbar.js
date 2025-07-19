@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FaSearch, FaUser, FaPlus, FaEnvelope, FaBars, FaTimes, FaBell, FaShoppingCart } from 'react-icons/fa';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FaSearch, FaUser, FaPlus, FaBars, FaTimes, FaBell, FaShoppingCart, FaHeart } from 'react-icons/fa';
+import ApiService from '../../services/api';
+import LoyaltyProgram from '../LoyaltyProgram';
 
-const Navbar = ({ isAuthenticated, logout }) => {
+const Navbar = ({ isAuthenticated, user, logout }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [animateLinks, setAnimateLinks] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Handle scroll effects with improved threshold and transition
   useEffect(() => {
@@ -36,12 +42,66 @@ const Navbar = ({ isAuthenticated, logout }) => {
     setAnimateLinks(true);
   }, []);
 
+  // Fetch cart item count for authenticated users
+  useEffect(() => {
+    const fetchCartCount = async () => {
+      if (isAuthenticated) {
+        try {
+          const cartData = await ApiService.getCart();
+          setCartItemCount(cartData.items?.length || 0);
+        } catch (error) {
+          console.error('Error fetching cart count:', error);
+          setCartItemCount(0);
+        }
+      } else {
+        setCartItemCount(0);
+      }
+    };
+
+    fetchCartCount();
+    
+    // Set up an interval to refresh cart count periodically
+    const interval = setInterval(fetchCartCount, 30000); // refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [isAuthenticated, location.pathname]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowUserDropdown(false);
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const toggleMenu = () => {
     setIsOpen(!isOpen);
   };
 
   const toggleSearchBar = () => {
     setShowSearchBar(!showSearchBar);
+    if (!showSearchBar) {
+      setTimeout(() => {
+        const searchInput = document.querySelector('input[type="search"]');
+        if (searchInput) searchInput.focus();
+      }, 100);
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/browse?search=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSearchBar(false);
+      setSearchQuery('');
+    }
+  };
+
+  const handleUserDropdownClick = (e) => {
+    e.stopPropagation();
+    setShowUserDropdown(!showUserDropdown);
   };
 
   const isActive = (path) => {
@@ -81,46 +141,69 @@ const Navbar = ({ isAuthenticated, logout }) => {
           {/* Desktop menu with staggered animations */}
           <div className="hidden md:ml-6 md:flex md:items-center">
             <div className="flex space-x-6">
-              {['/', '/browse', '/about'].map((path, index) => {
-                const label = path === '/' ? 'Home' : path === '/browse' ? 'Browse Items' : 'About';
-                return (
-                  <Link
-                    key={path}
-                    to={path}
-                    className={`px-3 py-2 rounded-md text-sm font-medium text-white relative hover:text-white transition-all duration-300 transform hover:-translate-y-0.5 ${isActive(path)} ${
-                      animateLinks ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                    }`}
-                    style={{ transitionDelay: `${index * 100}ms` }}
-                  >
-                    {label}
-                  </Link>
-                );
-              })}
+              {isAuthenticated ? (
+                // Authenticated user menu
+                ['/', '/browse', '/dashboard'].map((path, index) => {
+                  const label = path === '/' ? 'Home' : path === '/browse' ? 'Browse Items' : 'Dashboard';
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      className={`px-3 py-2 rounded-md text-sm font-medium text-white relative hover:text-white transition-all duration-300 transform hover:-translate-y-0.5 ${isActive(path)} ${
+                        animateLinks ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                      }`}
+                      style={{ transitionDelay: `${index * 100}ms` }}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })
+              ) : (
+                // Guest user menu
+                ['/', '/browse', '/about'].map((path, index) => {
+                  const label = path === '/' ? 'Home' : path === '/browse' ? 'Browse Items' : 'About';
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      className={`px-3 py-2 rounded-md text-sm font-medium text-white relative hover:text-white transition-all duration-300 transform hover:-translate-y-0.5 ${isActive(path)} ${
+                        animateLinks ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                      }`}
+                      style={{ transitionDelay: `${index * 100}ms` }}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })
+              )}
             </div>
           </div>
 
           {/* Search Icon/Bar with smoother transitions */}
           <div className="flex-1 flex items-center justify-center px-2 lg:px-6 lg:ml-6 lg:justify-end">
             {showSearchBar ? (
-              <div className="max-w-lg w-full animate-fade-in-down">
+              <form onSubmit={handleSearch} className="max-w-lg w-full animate-fade-in-down">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <FaSearch className="h-4 w-4 text-gray-400" aria-hidden="true" />
                   </div>
                   <input
                     type="search"
-                    className="block w-full pl-10 pr-3 py-2 border border-transparent rounded-md leading-5 bg-primary-700 text-white placeholder-gray-300 focus:outline-none focus:bg-white focus:border-white focus:text-gray-800 sm:text-sm transition-all duration-300 focus:ring-2 focus:ring-white focus:ring-opacity-50 shadow-inner-soft"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-full pl-10 pr-10 py-2 border border-transparent rounded-md leading-5 bg-primary-700 text-white placeholder-gray-300 focus:outline-none focus:bg-white focus:border-white focus:text-gray-800 sm:text-sm transition-all duration-300 focus:ring-2 focus:ring-white focus:ring-opacity-50 shadow-inner-soft"
                     placeholder="Search for items..."
                     autoFocus
                   />
                   <button
+                    type="button"
                     onClick={toggleSearchBar}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors duration-300"
                   >
                     <FaTimes className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
+              </form>
             ) : (
               <button
                 onClick={toggleSearchBar}
@@ -132,37 +215,40 @@ const Navbar = ({ isAuthenticated, logout }) => {
           </div>
 
           {/* User actions with enhanced hover effects and tooltips */}
-          <div className="hidden md:ml-6 md:flex md:items-center space-x-5">
+          <div className="hidden md:ml-6 md:flex md:items-center space-x-3">
             {isAuthenticated ? (
               <>
+                {/* Loyalty Points Display */}
+                <div className="mr-2">
+                  <LoyaltyProgram user={user} compact={true} />
+                </div>
                 <Link
-                  to="/messages"
+                  to="/cart"
                   className="text-white hover:bg-primary-700 p-2 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-glow relative group"
                 >
-                  <FaEnvelope className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center animate-pulse-slow">
-                    3
-                  </span>
+                  <FaShoppingCart className="h-5 w-5" />
+                  {cartItemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                      {cartItemCount > 9 ? '9+' : cartItemCount}
+                    </span>
+                  )}
                   <span className="absolute top-12 right-0 w-auto p-2 min-w-max rounded-md shadow-elevation-3 text-xs bg-gray-900 text-white 
                     transition-all duration-300 scale-0 group-hover:scale-100 origin-top z-10 pointer-events-none">
-                    Messages
+                    Cart
                   </span>
                 </Link>
                 <Link
-                  to="/notifications"
+                  to="/favorites"
                   className="text-white hover:bg-primary-700 p-2 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-glow relative group"
                 >
-                  <FaBell className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center animate-pulse-slow">
-                    2
-                  </span>
+                  <FaHeart className="h-5 w-5" />
                   <span className="absolute top-12 right-0 w-auto p-2 min-w-max rounded-md shadow-elevation-3 text-xs bg-gray-900 text-white 
                     transition-all duration-300 scale-0 group-hover:scale-100 origin-top z-10 pointer-events-none">
-                    Notifications
+                    Favorites
                   </span>
                 </Link>
                 <Link
-                  to="/new-listing"
+                  to="/sell"
                   className="text-white hover:bg-primary-700 p-2 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-glow relative group"
                 >
                   <FaPlus className="h-5 w-5" />
@@ -171,45 +257,67 @@ const Navbar = ({ isAuthenticated, logout }) => {
                     Add Listing
                   </span>
                 </Link>
-                <div className="relative group">
-                  <div>
-                    <Link
-                      to="/profile"
-                      className="bg-primary-700 flex text-sm rounded-full focus:outline-none ring-2 ring-white ring-opacity-60 transition-all duration-300 hover:scale-110 hover:ring-opacity-100 hover:shadow-glow"
-                    >
-                      <span className="sr-only">Open user menu</span>
-                      <div className="h-8 w-8 rounded-full bg-primary-800 flex items-center justify-center overflow-hidden hover:bg-primary-700">
+                <div className="relative">
+                  <button
+                    onClick={handleUserDropdownClick}
+                    className="bg-primary-700 flex text-sm rounded-full focus:outline-none ring-2 ring-white ring-opacity-60 transition-all duration-300 hover:scale-110 hover:ring-opacity-100 hover:shadow-glow"
+                  >
+                    <span className="sr-only">Open user menu</span>
+                    <div className="h-8 w-8 rounded-full bg-primary-800 flex items-center justify-center overflow-hidden hover:bg-primary-700">
+                      {user?.profileImage ? (
                         <img 
-                          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=128&h=128&q=80" 
+                          src={user.profileImage} 
                           alt="User" 
                           className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
                           onError={(e) => {
-                            e.target.onError = null;
-                            e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='12' cy='7' r='4'%3E%3C/circle%3E%3C/svg%3E";
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
                           }}
                         />
+                      ) : null}
+                      <FaUser className="h-4 w-4 text-white" style={{ display: user?.profileImage ? 'none' : 'block' }} />
+                    </div>
+                  </button>
+                  {showUserDropdown && (
+                    <div className="absolute top-12 right-0 w-48 bg-white rounded-md shadow-elevation-3 py-1 z-20 transform animate-fade-in-down">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                        <p className="text-sm text-gray-500 truncate">{user?.email}</p>
                       </div>
-                    </Link>
-                  </div>
-                  <div className="absolute top-12 right-0 w-48 bg-white rounded-md shadow-elevation-3 py-1 z-10 transform opacity-0 scale-95 pointer-events-none 
-                    group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-300 origin-top">
-                    {['Your Profile', 'Dashboard', 'Settings'].map((item, index) => (
-                      <Link 
-                        key={item} 
-                        to={`/${item.toLowerCase().replace(' ', '-')}`} 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600 transition-colors duration-200"
-                        style={{ transitionDelay: `${index * 50}ms` }}
-                      >
-                        {item}
-                      </Link>
-                    ))}
-                    <button
-                      onClick={logout}
-                      className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600 transition-colors duration-200"
-                    >
-                      Sign out
-                    </button>
-                  </div>
+                      {[
+                        { label: 'Profile', path: '/profile', icon: <FaUser className="h-4 w-4" /> },
+                        { label: 'Dashboard', path: '/dashboard', icon: <FaShoppingCart className="h-4 w-4" /> },
+                        { label: 'Loyalty Points', path: '/loyalty', icon: <FaHeart className="h-4 w-4" /> },
+                        { label: 'Cart', path: '/cart', icon: <FaShoppingCart className="h-4 w-4" /> },
+                        { label: 'My Listings', path: '/my-listings', icon: <FaPlus className="h-4 w-4" /> },
+                        { label: 'My Purchases', path: '/purchases', icon: <FaShoppingCart className="h-4 w-4" /> },
+                        { label: 'My Sales', path: '/sales', icon: <FaUser className="h-4 w-4" /> },
+                        { label: 'Favorites', path: '/favorites', icon: <FaHeart className="h-4 w-4" /> }
+                      ].map((item, index) => (
+                        <Link 
+                          key={item.label} 
+                          to={item.path} 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600 transition-colors duration-200"
+                          onClick={() => setShowUserDropdown(false)}
+                        >
+                          <span className="mr-3">{item.icon}</span>
+                          {item.label}
+                        </Link>
+                      ))}
+                      <div className="border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setShowUserDropdown(false);
+                          }}
+                          className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600 transition-colors duration-200"
+                        >
+                          <FaTimes className="h-4 w-4 mr-3" />
+                          Sign out
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -270,6 +378,34 @@ const Navbar = ({ isAuthenticated, logout }) => {
         </div>
       </div>
 
+      {/* Mobile Search Bar */}
+      {showSearchBar && (
+        <div className="md:hidden px-4 py-3 bg-primary-700">
+          <form onSubmit={handleSearch} className="w-full">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaSearch className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              </div>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-10 py-2 border border-transparent rounded-md leading-5 bg-white text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 sm:text-sm"
+                placeholder="Search for items..."
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={toggleSearchBar}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-300"
+              >
+                <FaTimes className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Mobile menu with smoother sliding animation */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-500 ease-in-out-back ${
@@ -277,21 +413,41 @@ const Navbar = ({ isAuthenticated, logout }) => {
         }`}
       >
         <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          {['Home', 'Browse Items', 'About'].map((item, index) => {
-            const path = item === 'Home' ? '/' : `/${item.toLowerCase().replace(' ', '-')}`;
-            return (
-              <Link
-                key={item}
-                to={path}
-                className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary-700 hover:shadow-glow transition-all duration-300 transform hover:-translate-y-0.5 ${
-                  isOpen ? 'animate-fade-in-up' : ''
-                }`}
-                style={{ animationDelay: `${50 * index}ms` }}
-              >
-                {item}
-              </Link>
-            );
-          })}
+          {isAuthenticated ? (
+            // Authenticated user mobile menu
+            ['Home', 'Browse Items', 'Dashboard'].map((item, index) => {
+              const path = item === 'Home' ? '/' : item === 'Browse Items' ? '/browse' : '/dashboard';
+              return (
+                <Link
+                  key={item}
+                  to={path}
+                  className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary-700 hover:shadow-glow transition-all duration-300 transform hover:-translate-y-0.5 ${
+                    isOpen ? 'animate-fade-in-up' : ''
+                  }`}
+                  style={{ animationDelay: `${50 * index}ms` }}
+                >
+                  {item}
+                </Link>
+              );
+            })
+          ) : (
+            // Guest user mobile menu
+            ['Home', 'Browse Items', 'About'].map((item, index) => {
+              const path = item === 'Home' ? '/' : `/${item.toLowerCase().replace(' ', '-')}`;
+              return (
+                <Link
+                  key={item}
+                  to={path}
+                  className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary-700 hover:shadow-glow transition-all duration-300 transform hover:-translate-y-0.5 ${
+                    isOpen ? 'animate-fade-in-up' : ''
+                  }`}
+                  style={{ animationDelay: `${50 * index}ms` }}
+                >
+                  {item}
+                </Link>
+              );
+            })
+          )}
         </div>
         <div className="pt-4 pb-3 border-t border-primary-700">
           <div className="px-2 space-y-1">
@@ -300,19 +456,22 @@ const Navbar = ({ isAuthenticated, logout }) => {
                 <div className="px-3 py-2 flex items-center">
                   <div className="flex-shrink-0 h-10 w-10 rounded-full overflow-hidden ring-2 ring-white ring-opacity-50">
                     <img 
-                      src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=128&h=128&q=80" 
+                      src={user?.profileImage || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=128&h=128&q=80"} 
                       alt="User profile"
                       className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
                     />
                   </div>
                   <div className="ml-3">
-                    <div className="text-base font-medium text-white">Alex Johnson</div>
-                    <div className="text-sm font-medium text-primary-200">alex@university.edu</div>
+                    <div className="text-base font-medium text-white">{user?.name || 'User'}</div>
+                    <div className="text-sm font-medium text-primary-200">{user?.email || 'user@university.edu'}</div>
                   </div>
                 </div>
-                {['Your Profile', 'Dashboard', 'Messages', 'Add New Listing'].map((item, index) => {
-                  const path = `/${item.toLowerCase().replace(/ /g, '-')}`;
-                  const hasNotification = item === 'Messages';
+                {['Profile', 'Dashboard', 'Cart', 'My Purchases', 'My Sales', 'Favorites', 'Sell Item'].map((item, index) => {
+                  const path = item === 'Profile' ? '/profile' : 
+                              item === 'Sell Item' ? '/sell' : 
+                              item === 'My Purchases' ? '/purchases' :
+                              item === 'My Sales' ? '/sales' :
+                              `/${item.toLowerCase().replace(' ', '-')}`;
                   
                   return (
                     <Link
@@ -324,9 +483,9 @@ const Navbar = ({ isAuthenticated, logout }) => {
                       style={{ animationDelay: `${100 + (50 * index)}ms` }}
                     >
                       {item}
-                      {hasNotification && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white animate-pulse-slow">
-                          3
+                      {item === 'Cart' && cartItemCount > 0 && (
+                        <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                          {cartItemCount}
                         </span>
                       )}
                     </Link>

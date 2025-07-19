@@ -1,31 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaUser, FaEdit, FaSave, FaUniversity, FaEnvelope, FaPhone, FaCalendarAlt } from 'react-icons/fa';
+import ApiService from '../services/api';
 
-const Profile = () => {
-  // Mock user data
-  const initialUserData = {
-    name: 'Alex Johnson',
-    email: 'alex@university.edu',
-    phone: '(555) 123-4567',
-    university: 'University of California, Berkeley',
-    joinDate: 'August 2022',
-    bio: 'Computer Science student passionate about technology and sustainability. Looking to buy and sell items within the campus community.',
-    profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=128&h=128&q=80'
+const Profile = ({ user }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [tempUserData, setTempUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const profileData = await ApiService.getUserProfile();
+      setUserData(profileData);
+      setTempUserData(profileData);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError('Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [userData, setUserData] = useState(initialUserData);
-  const [tempUserData, setTempUserData] = useState(initialUserData);
-
-  const handleEditToggle = () => {
+  const handleEditToggle = async () => {
     if (isEditing) {
       // Save changes
-      setUserData(tempUserData);
+      try {
+        setSaving(true);
+        setError('');
+        const updatedUser = await ApiService.updateUserProfile(tempUserData);
+        setUserData(updatedUser.user);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        setError(error.message || 'Failed to update profile');
+      } finally {
+        setSaving(false);
+      }
     } else {
       // Start editing
       setTempUserData(userData);
+      setIsEditing(true);
     }
-    setIsEditing(!isEditing);
   };
 
   const handleInputChange = (e) => {
@@ -39,25 +61,57 @@ const Profile = () => {
   const handleCancel = () => {
     setTempUserData(userData);
     setIsEditing(false);
+    setError('');
   };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <div className="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile not found</h2>
+          <p className="text-gray-600">Unable to load your profile data.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="bg-white shadow overflow-hidden rounded-lg">
-          {/* Header Section */}
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center bg-gray-50">
+          {/* Header Section */}          <div className="px-4 py-5 sm:px-6 flex justify-between items-center bg-gray-50">
             <div>
               <h3 className="text-lg leading-6 font-medium text-gray-900">User Profile</h3>
               <p className="mt-1 max-w-2xl text-sm text-gray-500">Personal details and account settings</p>
             </div>
             <button
               onClick={handleEditToggle}
+              disabled={saving}
               className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                 isEditing ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-600 hover:bg-primary-700'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500`}
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50`}
             >
-              {isEditing ? (
+              {saving ? (
+                <>
+                  <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  Saving...
+                </>
+              ) : isEditing ? (
                 <>
                   <FaSave className="-ml-1 mr-2 h-4 w-4" />
                   Save Changes
@@ -70,6 +124,13 @@ const Profile = () => {
               )}
             </button>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="px-4 py-3 border-l-4 border-red-400 bg-red-50">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
           {/* Content Section */}
           <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
@@ -92,12 +153,11 @@ const Profile = () => {
                       <FaEdit className="h-4 w-4 text-gray-500" />
                     </button>
                   )}
-                </div>
-                <div className="mt-4 text-center">
+                </div>                <div className="mt-4 text-center">
                   <h2 className="text-xl font-medium text-gray-900">{userData.name}</h2>
                   <p className="text-sm text-gray-500 flex items-center justify-center mt-1">
                     <FaCalendarAlt className="mr-1 h-3 w-3" />
-                    Member since {userData.joinDate}
+                    Member since {formatDate(userData.joinDate)}
                   </p>
                 </div>
               </div>
@@ -156,12 +216,12 @@ const Profile = () => {
                         type="tel"
                         name="phone"
                         id="phone"
-                        value={tempUserData.phone}
+                        value={tempUserData.phone || ''}
                         onChange={handleInputChange}
                         className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
                       />
                     ) : (
-                      <p className="text-sm text-gray-900 py-2">{userData.phone}</p>
+                      <p className="text-sm text-gray-900 py-2">{userData.phone || 'Not provided'}</p>
                     )}
                   </div>
 
@@ -195,12 +255,12 @@ const Profile = () => {
                         name="bio"
                         id="bio"
                         rows={3}
-                        value={tempUserData.bio}
+                        value={tempUserData.bio || ''}
                         onChange={handleInputChange}
                         className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
                       />
                     ) : (
-                      <p className="text-sm text-gray-900 py-2">{userData.bio}</p>
+                      <p className="text-sm text-gray-900 py-2">{userData.bio || 'No bio provided'}</p>
                     )}
                   </div>
                 </div>

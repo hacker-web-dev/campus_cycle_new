@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { FaFilter, FaTimes, FaSearch, FaSort, FaList, FaThLarge, FaHeart, FaRegHeart, FaPlus, FaShoppingCart } from 'react-icons/fa';
+import { FaFilter, FaTimes, FaSearch, FaSort, FaList, FaThLarge, FaHeart, FaRegHeart, FaPlus } from 'react-icons/fa';
 import ApiService from '../services/api';
 
 const Browse = () => {
@@ -13,7 +13,6 @@ const Browse = () => {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [condition, setCondition] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
@@ -55,33 +54,21 @@ const Browse = () => {
         const categoriesData = await ApiService.getCategories();
         setCategories(categoriesData);
 
-        // Build query parameters
-        const queryParams = new URLSearchParams();
-        if (selectedCategory && selectedCategory !== 'All Categories') {
-          queryParams.append('category', selectedCategory);
-        }
-        if (searchTerm) {
-          queryParams.append('search', searchTerm);
-        }
-        if (priceRange.min) {
-          queryParams.append('minPrice', priceRange.min);
-        }
-        if (priceRange.max) {
-          queryParams.append('maxPrice', priceRange.max);
-        }
-        if (condition) {
-          queryParams.append('condition', condition);
-        }
-        if (selectedLocation) {
-          queryParams.append('location', selectedLocation);
-        }
-        queryParams.append('sortBy', sortBy);
+        // Fetch items with current filters
+        const filters = {
+          category: selectedCategory !== 'All Categories' ? selectedCategory : '',
+          search: searchTerm,
+          minPrice: priceRange.min,
+          maxPrice: priceRange.max,
+          condition: condition,
+          sortBy: sortBy
+        };
 
-        // Fetch items with filters
-        const itemsData = await ApiService.getItems(Object.fromEntries(queryParams));
-        setItems(Array.isArray(itemsData) ? itemsData : []);
+        const itemsData = await ApiService.getItems(filters);
+        setItems(itemsData || []); // Ensure we always have an array
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Set fallback data
         setItems([]);
         if (categories.length === 0) {
           setCategories([
@@ -103,11 +90,10 @@ const Browse = () => {
     };
 
     fetchData();
-  }, [selectedCategory, searchTerm, priceRange, condition, selectedLocation, sortBy]);
+  }, [selectedCategory, searchTerm, priceRange, condition, sortBy]);
 
-  // Mock conditions and locations
+  // Mock conditions
   const conditions = ["New", "Like New", "Good", "Fair", "Poor"];
-  const locations = ["All Locations", "Preston Campus", "Burnley Campus"];
 
   // Handle favorite toggle
   const handleFavoriteToggle = async (itemId) => {
@@ -130,27 +116,25 @@ const Browse = () => {
     }
   };
 
-  // Handle add to cart
-  const handleAddToCart = async (itemId, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!isAuthenticated) {
-      alert('Please log in to add items to cart');
-      return;
+  // Filter items on frontend (backup for when backend filters aren't working)
+  const filteredItems = items.filter(item => {
+    if (searchTerm && !item.title.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
     }
-
-    try {
-      await ApiService.addToCart(itemId, 1);
-      alert('Item added to cart!');
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      alert(error.message || 'Error adding item to cart');
+    if (selectedCategory && selectedCategory !== "All Categories" && item.category !== selectedCategory) {
+      return false;
     }
-  };
-
-  // Use items directly from API instead of filtering locally
-  const filteredItems = items;
+    if (priceRange.min && item.price < parseInt(priceRange.min)) {
+      return false;
+    }
+    if (priceRange.max && item.price > parseInt(priceRange.max)) {
+      return false;
+    }
+    if (condition && item.condition !== condition) {
+      return false;
+    }
+    return true;
+  });
 
   // Reset all filters
   const resetFilters = () => {
@@ -158,7 +142,6 @@ const Browse = () => {
     setSelectedCategory('');
     setPriceRange({ min: '', max: '' });
     setCondition('');
-    setSelectedLocation('');
     setSortBy('newest');
     setIsFilterOpen(false);
   };
@@ -296,28 +279,6 @@ const Browse = () => {
                     </div>
                   </div>
 
-                  {/* Location Filter */}
-                  <div>
-                    <h3 className="font-medium text-gray-900">Location</h3>
-                    <div className="mt-2 space-y-2">
-                      {locations.map((loc, index) => (
-                        <div key={index} className="flex items-center">
-                          <input
-                            id={`mobile-location-${index}`}
-                            name="location"
-                            type="radio"
-                            checked={selectedLocation === loc || (loc === 'All Locations' && !selectedLocation)}
-                            onChange={() => setSelectedLocation(loc === 'All Locations' ? '' : loc)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label htmlFor={`mobile-location-${index}`} className="ml-3 text-sm text-gray-700">
-                            {loc}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="flex space-x-3">
                     <button
                       onClick={() => setIsFilterOpen(false)}
@@ -420,28 +381,6 @@ const Browse = () => {
                 </div>
               </div>
 
-              {/* Location Filter */}
-              <div>
-                <h3 className="font-medium text-gray-900">Location</h3>
-                <div className="mt-2 space-y-2">
-                  {locations.map((loc, index) => (
-                    <div key={index} className="flex items-center">
-                      <input
-                        id={`location-${index}`}
-                        name="location"
-                        type="radio"
-                        checked={selectedLocation === loc || (loc === 'All Locations' && !selectedLocation)}
-                        onChange={() => setSelectedLocation(loc === 'All Locations' ? '' : loc)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor={`location-${index}`} className="ml-3 text-sm text-gray-700">
-                        {loc}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Reset Filters */}
               <button
                 onClick={resetFilters}
@@ -510,7 +449,7 @@ const Browse = () => {
               </div>
 
               {/* Active Filters */}
-              {(selectedCategory || priceRange.min || priceRange.max || condition || selectedLocation) && (
+              {(selectedCategory || priceRange.min || priceRange.max || condition) && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {selectedCategory && selectedCategory !== "All Categories" && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
@@ -544,19 +483,6 @@ const Browse = () => {
                       <button
                         type="button"
                         onClick={() => setCondition('')}
-                        className="ml-1 flex-shrink-0 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none"
-                      >
-                        <span className="sr-only">Remove filter</span>
-                        <FaTimes size={10} />
-                      </button>
-                    </span>
-                  )}
-                  {selectedLocation && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                      Location: {selectedLocation}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLocation('')}
                         className="ml-1 flex-shrink-0 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none"
                       >
                         <span className="sr-only">Remove filter</span>
@@ -624,14 +550,12 @@ const Browse = () => {
                       <Link to={`/product/${item._id}`} className="block">
                         <div className="relative h-48">
                           <img
-                            src={item.images && item.images.length > 0 ? 
-                              (item.images[0].startsWith('http') ? item.images[0] : `http://localhost:5000${item.images[0]}`) : 
-                              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+'}
+                            src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/300x200?text=No+Image'}
                             alt={item.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               e.target.onerror = null;
-                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                              e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
                             }}
                           />
                           <div className="absolute top-2 left-2 px-2 py-1 bg-blue-600 rounded text-xs font-bold text-white">
@@ -655,9 +579,9 @@ const Browse = () => {
                       )}
                     </div>
                     
-                    <div className="p-4">
-                      <Link to={`/product/${item._id}`} className="block">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate hover:text-primary-600">{item.title}</h3>
+                    <Link to={`/product/${item._id}`} className="block">
+                      <div className="p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 truncate">{item.title}</h3>
                         <p className="mt-1 text-xl font-bold text-blue-600">${item.price}</p>
                         <div className="mt-2 flex items-center text-sm text-gray-500">
                           <span>{item.location}</span>
@@ -683,21 +607,8 @@ const Browse = () => {
                             </div>
                           </div>
                         )}
-                      </Link>
-                      
-                      {/* Add to Cart Button */}
-                      {isAuthenticated && (
-                        <div className="mt-3">
-                          <button
-                            onClick={(e) => handleAddToCart(item._id, e)}
-                            className="w-full bg-primary-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-700 transition-colors duration-200 flex items-center justify-center"
-                          >
-                            <FaShoppingCart className="mr-2" />
-                            Add to Cart
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    </Link>
                   </div>
                 ))}
               </div>
@@ -712,12 +623,12 @@ const Browse = () => {
                       <div className="relative w-full sm:w-48 h-48">
                         <Link to={`/product/${item._id}`}>
                           <img
-                            src={item.images && item.images.length > 0 ? item.images[0] : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+'}
+                            src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/300x200?text=No+Image'}
                             alt={item.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               e.target.onerror = null;
-                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                              e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
                             }}
                           />
                         </Link>
@@ -740,7 +651,7 @@ const Browse = () => {
                       
                       <div className="flex-1 p-4">
                         <Link to={`/product/${item._id}`}>
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2 hover:text-primary-600">{item.title}</h3>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
                           <p className="text-2xl font-bold text-blue-600 mb-2">${item.price}</p>
                           <p className="text-gray-600 mb-3 line-clamp-2">{item.description}</p>
                           
@@ -753,7 +664,7 @@ const Browse = () => {
                           </div>
                           
                           {item.features && item.features.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-3">
+                            <div className="flex flex-wrap gap-1">
                               {item.features.slice(0, 3).map((feature, index) => (
                                 <span key={index} className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
                                   {feature}
@@ -767,19 +678,6 @@ const Browse = () => {
                             </div>
                           )}
                         </Link>
-                        
-                        {/* Add to Cart Button for List View */}
-                        {isAuthenticated && (
-                          <div className="mt-3">
-                            <button
-                              onClick={(e) => handleAddToCart(item._id, e)}
-                              className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700 transition-colors duration-200 flex items-center"
-                            >
-                              <FaShoppingCart className="mr-2" />
-                              Add to Cart
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
