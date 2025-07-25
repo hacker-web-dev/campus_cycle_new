@@ -71,67 +71,11 @@ const MessagingSystem = ({ user }) => {
     } catch (error) {
       console.error('Error checking pending transactions:', error);
       
-      // If API fails (404), create mock data for testing
-      console.log('Using mock pending transactions for testing...');
-      const mockPendingTransactions = [
-        { 
-          _id: '1', 
-          totalAmount: 150, 
-          createdAt: new Date(), 
-          items: [{ item: { title: 'Campus Bike' }, quantity: 1, price: 150 }]
-        },
-        { 
-          _id: '2', 
-          totalAmount: 45, 
-          createdAt: new Date(), 
-          items: [{ item: { title: 'Textbook' }, quantity: 1, price: 45 }]
-        }
-      ];
-      setPendingTransactionReminders(mockPendingTransactions);
+      // If API fails (no backend endpoint), don't show any reminders
+      setPendingTransactionReminders([]);
     }
   };
 
-  // Test function to create a pending order (for testing)
-  const createTestPendingOrder = async () => {
-    try {
-      // Get cart items first
-      const cart = await ApiService.getCart();
-      if (cart.items.length === 0) {
-        alert('Please add items to cart first to test pending orders!');
-        return;
-      }
-
-      const testOrderData = {
-        items: cart.items.map((cartItem) => ({
-          itemId: cartItem.item._id,
-          quantity: cartItem.quantity,
-          sellerId: cartItem.item.seller._id,
-        })),
-        shippingAddress: {
-          name: 'Test User',
-          address: '123 Test St',
-          city: 'Preston',
-          state: 'Lancashire',
-          zipCode: 'PR1 2HE',
-          phone: '01772123456',
-        },
-        paymentMethod: 'card',
-        paymentDetails: {
-          cardNumber: '4111111111111111',
-          cardType: 'Visa',
-          cardName: 'Test User',
-        },
-        notes: 'Test pending order for reminders'
-      };
-
-      await ApiService.createPendingOrder(testOrderData);
-      alert('Test pending order created! Check for reminders in messaging system.');
-      checkPendingTransactions(); // Refresh immediately
-    } catch (error) {
-      console.error('Error creating test pending order:', error);
-      alert('Failed to create test order. Make sure items are in cart.');
-    }
-  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -512,15 +456,6 @@ const MessagingSystem = ({ user }) => {
           )}
         </div>
       )}
-
-      {/* Test Button for Creating Pending Orders */}
-      <button
-        onClick={createTestPendingOrder}
-        className="fixed bottom-96 right-6 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-xs shadow-lg z-40"
-        title="Create test pending order (for testing reminders)"
-      >
-        Test Pending Order
-      </button>
 
       {/* Pending Transaction Reminders */}
       {pendingTransactionReminders.length > 0 && (

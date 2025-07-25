@@ -289,12 +289,18 @@ class ApiService {
       return this.makeRequest('/orders/pending');
     } catch (error) {
       // Fallback: get all user purchases and filter for pending
-      const purchases = await this.makeRequest('/orders/my-purchases');
-      return purchases.filter(order => 
-        order.status === 'pending' || 
-        order.status === 'processing' || 
-        order.status === 'incomplete'
-      );
+      try {
+        const purchases = await this.makeRequest('/orders/my-purchases');
+        return purchases.filter(order => 
+          order.status === 'pending' || 
+          order.status === 'processing' || 
+          order.paymentStatus === 'pending'
+        );
+      } catch (fallbackError) {
+        // If both fail, return empty array (no pending transactions)
+        console.log('No pending transactions endpoint available');
+        return [];
+      }
     }
   }
 
