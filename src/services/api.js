@@ -251,11 +251,24 @@ class ApiService {
     return this.makeRequest(`/conversations/${userId}/messages`);
   }
 
-  async sendMessage(receiverId, content) {
+  async sendMessage(receiverId, content, encrypted = false) {
     return this.makeRequest('/messages', {
       method: 'POST',
-      body: JSON.stringify({ receiverId, content }),
+      body: JSON.stringify({ receiverId, content, encrypted }),
     });
+  }
+
+  // Report message endpoint
+  async reportMessage(messageId, reason, senderId) {
+    return this.makeRequest('/messages/report', {
+      method: 'POST',
+      body: JSON.stringify({ messageId, reason, senderId }),
+    });
+  }
+
+  // Get pending transactions for reminders
+  async getPendingTransactions() {
+    return this.makeRequest('/orders/pending');
   }
 
   // Loyalty Points endpoints
