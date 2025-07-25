@@ -1578,6 +1578,152 @@ app.get('/api/chatbot/history', authenticateToken, async (req, res) => {
 });
 
 // ======================
+// PENDING ORDER CREATION FOR REMINDERS
+// ======================
+
+// Create pending order (for cart checkout initialization)
+app.post('/api/orders/pending', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      items, 
+      shippingAddress, 
+      billingAddress, 
+      paymentMethod, 
+      paymentDetails,
+      notes 
+    } = req.body;
+
+    // Validate required fields
+    if (!items || !items.length || !shippingAddress || !paymentMethod) {
+      return res.status(400).json({ message: 'Missing required order information' });
+    }
+
+    let totalAmount = 0;
+    const orderItems = [];
+
+    // Process each item and calculate total
+    for (const orderItem of items) {
+      const item = await Item.findById(orderItem.itemId).populate('seller', 'name email');
+      
+      if (!item) {
+        return res.status(404).json({ message: `Item ${orderItem.itemId} not found` });
+      }
+
+      if (item.status !== 'active') {
+        return res.status(400).json({ message: `Item "${item.title}" is no longer available` });
+      }
+
+      const itemTotal = item.price * (orderItem.quantity || 1);
+      totalAmount += itemTotal;
+
+      orderItems.push({
+        item: item._id,
+        quantity: orderItem.quantity || 1,
+        price: item.price
+      });
+    }
+
+    // Group items by seller to create separate pending orders
+    const itemsBySeller = {};
+    for (const orderItem of orderItems) {
+      const item = await Item.findById(orderItem.item).populate('seller', 'name email');
+      const sellerId = item.seller._id.toString();
+      
+      if (!itemsBySeller[sellerId]) {
+        itemsBySeller[sellerId] = {
+          seller: item.seller,
+          items: [],
+          totalAmount: 0
+        };
+      }
+      
+      itemsBySeller[sellerId].items.push(orderItem);
+      itemsBySeller[sellerId].totalAmount += orderItem.price * orderItem.quantity;
+    }
+
+    const pendingOrders = [];
+
+    // Create pending orders for each seller
+    for (const [sellerId, sellerData] of Object.entries(itemsBySeller)) {
+      const order = new Order({
+        buyer: req.user.userId,
+        seller: sellerId,
+        items: sellerData.items,
+        totalAmount: sellerData.totalAmount,
+        shippingAddress,
+        billingAddress: billingAddress || shippingAddress,
+        paymentMethod,
+        paymentDetails: {
+          cardLast4: paymentDetails?.cardNumber?.slice(-4) || '****',
+          cardType: paymentDetails?.cardType || 'Unknown',
+          transactionId: 'PENDING_' + Date.now() + Math.random().toString(36).substr(2, 5)
+        },
+        paymentStatus: 'pending', // Keep as pending
+        status: 'pending', // Keep as pending
+        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        notes,
+        verificationPin: Math.floor(1000 + Math.random() * 9000).toString()
+      });
+
+      await order.save();
+      pendingOrders.push(order);
+    }
+
+    // Don't clear cart yet or mark items as sold - this is just pending
+
+    res.status(201).json({
+      message: 'Pending orders created successfully',
+      orders: pendingOrders,
+      order: pendingOrders[0]
+    });
+  } catch (error) {
+    console.error('Pending order creation error:', error);
+    res.status(500).json({ message: 'Server error creating pending order' });
+  }
+});
+
+// Complete pending order
+app.post('/api/orders/:orderId/complete', authenticateToken, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.buyer.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to complete this order' });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({ message: 'Order is not in pending state' });
+    }
+
+    // Complete the order
+    order.status = 'confirmed';
+    order.paymentStatus = 'completed';
+    order.paymentDetails.transactionId = 'TXN_' + Date.now() + Math.random().toString(36).substr(2, 5);
+    
+    await order.save();
+
+    // Mark items as sold
+    for (const orderItem of order.items) {
+      await Item.findByIdAndUpdate(orderItem.item, { status: 'sold' });
+    }
+
+    // Award points to buyer and seller
+    await awardPoints(order.buyer, 5, 'Purchase completed', order._id);
+    await awardPoints(order.seller, 10, 'Item sold', order._id);
+
+    res.json({ message: 'Order completed successfully', order });
+  } catch (error) {
+    console.error('Error completing order:', error);
+    res.status(500).json({ message: 'Server error completing order' });
+  }
+});
+
+// ======================
 // UPDATE ORDER CREATION TO AWARD POINTS
 // ======================
 

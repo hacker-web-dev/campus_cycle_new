@@ -212,17 +212,31 @@ const Checkout = () => {
         verificationPin: Math.floor(1000 + Math.random() * 9000).toString(),
       };
 
-      const order = await ApiService.createOrderFromCart(orderPayload);
-      setOrderData(order.order);
+      // First create a pending order
+      const pendingOrder = await ApiService.createPendingOrder(orderPayload);
+      
+      // Show user the pending order and payment options
+      alert(`Order created! Total: £${(pendingOrder.order.totalAmount).toFixed(2)}. Complete payment to confirm.`);
+      
+      // For now, auto-complete the order (in real app, user would choose to pay)
+      setTimeout(async () => {
+        try {
+          const completedOrder = await ApiService.createOrderFromCart(orderPayload);
+          setOrderData(completedOrder.order);
 
-      // Use the PIN from the order payload
-      setVerificationPin(orderPayload.verificationPin);
+          // Use the PIN from the order payload
+          setVerificationPin(orderPayload.verificationPin);
 
-      setOrderComplete(true);
-      setShowPinPopup(true);
+          setOrderComplete(true);
+          setShowPinPopup(true);
 
-      // Trigger beautiful confetti animation
-      triggerConfetti();
+          // Trigger beautiful confetti animation
+          triggerConfetti();
+        } catch (error) {
+          console.error("Error completing order:", error);
+          alert("Payment confirmation failed. Your order is still pending.");
+        }
+      }, 3000); // 3 second delay to simulate pending state
     } catch (error) {
       console.error("Error processing order:", error);
       alert("Failed to process order. Please try again.");

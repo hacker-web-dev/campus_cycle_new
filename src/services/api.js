@@ -230,6 +230,22 @@ class ApiService {
     });
   }
 
+  // Create pending order (for checkout initialization)
+  async createPendingOrder(orderData) {
+    return this.makeRequest('/orders/pending', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+  }
+
+  // Complete pending order (convert to confirmed)
+  async completePendingOrder(orderId, paymentDetails) {
+    return this.makeRequest(`/orders/${orderId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(paymentDetails),
+    });
+  }
+
   // Reviews endpoints
   async getUserReviews(userId) {
     return this.makeRequest(`/reviews/user/${userId}`);
