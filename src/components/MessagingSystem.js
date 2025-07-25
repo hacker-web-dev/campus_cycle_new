@@ -63,7 +63,7 @@ const MessagingSystem = ({ user }) => {
       const response = await ApiService.getPendingTransactions();
       const reminders = response.filter(transaction => {
         const daysSincePending = Math.floor((new Date() - new Date(transaction.createdAt)) / (1000 * 60 * 60 * 24));
-        return daysSincePending >= 2; // Remind after 2 days
+        return daysSincePending >= 0; // Remind immediately
       });
       setPendingTransactionReminders(reminders);
     } catch (error) {

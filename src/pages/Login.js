@@ -55,6 +55,8 @@ const Login = ({ login, isAuthenticated }) => {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
+    } else if (!formData.email.endsWith('@uclan.ac.uk')) {
+      newErrors.email = 'Please use your UCLan email address (@uclan.ac.uk)';
     }
 
     // Validate password
@@ -155,12 +157,13 @@ const Login = ({ login, isAuthenticated }) => {
                     className={`block w-full pl-10 pr-3 py-2 border ${
                       errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300 group-hover:border-primary-400'
                     } rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-all duration-300`}
-                    placeholder="name@university.edu"
+                    placeholder="student@uclan.ac.uk"
                   />
                 </div>
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600 animate-fade-in-up">{errors.email}</p>
                 )}
+                <p className="mt-1 text-sm text-blue-600">🎓 Login is only available for UCLan students</p>
               </div>
 
               <div className={`transition-all duration-300 transform ${formFocus === 'password' ? 'scale-[1.02]' : 'scale-100'}`}>

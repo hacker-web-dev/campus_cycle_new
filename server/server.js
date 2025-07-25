@@ -188,6 +188,7 @@ const messageSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true },
+  encrypted: { type: Boolean, default: false },
   read: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
@@ -266,6 +267,13 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password, university } = req.body;
 
+    // Check if email is from uclan.ac.uk domain
+    if (!email || !email.endsWith('@uclan.ac.uk')) {
+      return res.status(400).json({ 
+        message: 'Registration is only allowed for UCLan students. Please use your @uclan.ac.uk email address.' 
+      });
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
@@ -276,7 +284,7 @@ app.post('/api/auth/register', async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      university
+      university: university || 'University of Central Lancashire' // Default to UCLan
     });
 
     await user.save();
@@ -312,6 +320,13 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password) {
       console.log('Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // Check if email is from uclan.ac.uk domain
+    if (!email.endsWith('@uclan.ac.uk')) {
+      return res.status(400).json({ 
+        message: 'Login is only allowed for UCLan students. Please use your @uclan.ac.uk email address.' 
+      });
     }
 
     console.log('Looking for user with email:', email);
@@ -396,6 +411,13 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
 
     // Check if email is being changed and if it's already taken
     if (email !== user.email) {
+      // Check if new email is from uclan.ac.uk domain
+      if (!email.endsWith('@uclan.ac.uk')) {
+        return res.status(400).json({ 
+          message: 'Email updates are only allowed for UCLan students. Please use your @uclan.ac.uk email address.' 
+        });
+      }
+      
       const existingUser = await User.findOne({ email });
       if (existingUser) {
         return res.status(400).json({ message: 'Email already in use' });
@@ -1287,12 +1309,13 @@ app.get('/api/conversations/:userId/messages', authenticateToken, async (req, re
 // Send a message
 app.post('/api/messages', authenticateToken, async (req, res) => {
   try {
-    const { receiverId, content } = req.body;
+    const { receiverId, content, encrypted = false } = req.body;
 
     const message = new Message({
       sender: req.user.userId,
       receiver: receiverId,
-      content
+      content,
+      encrypted
     });
 
     await message.save();
@@ -1321,6 +1344,59 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ message: 'Server error sending message' });
+  }
+});
+
+// Report message endpoint
+app.post('/api/messages/report', authenticateToken, async (req, res) => {
+  try {
+    const { messageId, reason, senderId } = req.body;
+
+    // Find the message
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Create a report record (you can create a Report schema later)
+    console.log(`Message reported: ${messageId} by user ${req.user.userId} for reason: ${reason}`);
+    console.log(`Sender ${senderId} flagged for inappropriate behavior`);
+
+    // Here you would typically:
+    // 1. Save report to database
+    // 2. Flag the sender's account
+    // 3. Notify moderators
+    
+    res.json({ message: 'Message reported successfully' });
+  } catch (error) {
+    console.error('Error reporting message:', error);
+    res.status(500).json({ message: 'Server error reporting message' });
+  }
+});
+
+// Get pending orders/transactions
+app.get('/api/orders/pending', authenticateToken, async (req, res) => {
+  try {
+    const pendingOrders = await Order.find({ 
+      buyer: req.user.userId,
+      $or: [
+        { status: 'pending' },
+        { status: 'processing' },
+        { paymentStatus: 'pending' },
+        { paymentStatus: 'processing' }
+      ]
+    })
+    .populate('seller', 'name email')
+    .populate({
+      path: 'items.item',
+      select: 'title price images'
+    })
+    .sort({ createdAt: -1 });
+
+    res.json(pendingOrders);
+  } catch (error) {
+    console.error('Error fetching pending orders:', error);
+    res.status(500).json({ message: 'Server error fetching pending orders' });
   }
 });
 

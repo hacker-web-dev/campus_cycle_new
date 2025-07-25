@@ -268,7 +268,18 @@ class ApiService {
 
   // Get pending transactions for reminders
   async getPendingTransactions() {
-    return this.makeRequest('/orders/pending');
+    try {
+      // First try the dedicated endpoint
+      return this.makeRequest('/orders/pending');
+    } catch (error) {
+      // Fallback: get all user purchases and filter for pending
+      const purchases = await this.makeRequest('/orders/my-purchases');
+      return purchases.filter(order => 
+        order.status === 'pending' || 
+        order.status === 'processing' || 
+        order.status === 'incomplete'
+      );
+    }
   }
 
   // Loyalty Points endpoints
