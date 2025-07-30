@@ -165,9 +165,6 @@ const Checkout = () => {
     setProcessing(true);
 
     try {
-      // Simulate processing delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
       const orderPayload = {
         items: cart.items.map((cartItem) => ({
           itemId: cartItem.item._id,
@@ -212,15 +209,10 @@ const Checkout = () => {
         verificationPin: Math.floor(1000 + Math.random() * 9000).toString(),
       };
 
-      // First create a pending order
-      const pendingOrder = await ApiService.createPendingOrder(orderPayload);
-      
-      // Show user the pending order and payment options
-      alert(`Order created! Total: £${(pendingOrder.order.totalAmount).toFixed(2)}. Complete payment to confirm.`);
-      
-      // For now, auto-complete the order (in real app, user would choose to pay)
+      // Simulate payment processing (in real app, this would be actual payment gateway)
       setTimeout(async () => {
         try {
+          // Create the confirmed order directly after successful payment
           const completedOrder = await ApiService.createOrderFromCart(orderPayload);
           setOrderData(completedOrder.order);
 
@@ -234,13 +226,14 @@ const Checkout = () => {
           triggerConfetti();
         } catch (error) {
           console.error("Error completing order:", error);
-          alert("Payment confirmation failed. Your order is still pending.");
+          alert("Payment failed. Please try again.");
+        } finally {
+          setProcessing(false);
         }
-      }, 3000); // 3 second delay to simulate pending state
+      }, 3000); // 3 second delay to simulate payment processing
     } catch (error) {
       console.error("Error processing order:", error);
       alert("Failed to process order. Please try again.");
-    } finally {
       setProcessing(false);
     }
   };
@@ -422,7 +415,23 @@ const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Processing Overlay */}
+      {processing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8 text-center max-w-md w-full mx-4">
+            <div className="mb-4">
+              <FaSpinner className="animate-spin text-primary-600 text-4xl mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Processing Payment</h3>
+            <p className="text-gray-600">Please wait while we securely process your payment...</p>
+            <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-primary-600 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8 flex items-center">
@@ -904,7 +913,7 @@ const Checkout = () => {
                       {processing ? (
                         <>
                           <FaSpinner className="animate-spin mr-2" />
-                          Processing...
+                          Processing Payment...
                         </>
                       ) : (
                         "Complete Order"
