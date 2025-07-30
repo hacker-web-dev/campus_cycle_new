@@ -494,8 +494,9 @@ const Checkout = () => {
                       >
                         <img
                           src={
-                            cartItem.item.images?.[0] ||
-                            "https://via.placeholder.com/100x100?text=No+Image"
+                            cartItem.item.images?.[0] ? 
+                              (cartItem.item.images[0].startsWith('http') ? cartItem.item.images[0] : `https://campuscyclenew-production.up.railway.app${cartItem.item.images[0]}`) :
+                              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBkb21pbmFudC1iYXNlbGluZT0iY2VudHJhbCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc>'
                           }
                           alt={cartItem.item.title}
                           className="h-16 w-16 rounded-lg object-cover"

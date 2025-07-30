@@ -779,7 +779,7 @@ app.post('/api/items', authenticateToken, upload.array('images', 5), async (req,
     // Handle uploaded images
     let images = [];
     if (req.files && req.files.length > 0) {
-      const baseUrl = process.env.SERVER_BASE_URL || `http://localhost:${PORT}`;
+      const baseUrl = process.env.SERVER_BASE_URL || `https://campuscyclenew-production.up.railway.app`;
       images = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
     }
     
@@ -1186,7 +1186,8 @@ app.post('/api/upload/images', authenticateToken, upload.array('images', 5), (re
       return res.status(400).json({ message: 'No images uploaded' });
     }
 
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+    const baseUrl = process.env.SERVER_BASE_URL || `https://campuscyclenew-production.up.railway.app`;
+    const imageUrls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
     
     res.json({
       message: 'Images uploaded successfully',
