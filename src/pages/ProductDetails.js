@@ -218,9 +218,9 @@ const ProductDetails = ({ user }) => {
               <div className="relative pb-[75%]">
                 <img
                   src={product.images?.[activeImageIndex] ? 
-                    (product.images[activeImageIndex].startsWith('http') ? product.images[activeImageIndex] : `http://localhost:5000${product.images[activeImageIndex]}`) :
+                    (product.images[activeImageIndex].startsWith('http') ? product.images[activeImageIndex] : `https://campuscyclenew-production.up.railway.app${product.images[activeImageIndex]}`) :
                     product.images?.[0] ? 
-                      (product.images[0].startsWith('http') ? product.images[0] : `http://localhost:5000${product.images[0]}`) :
+                      (product.images[0].startsWith('http') ? product.images[0] : `https://campuscyclenew-production.up.railway.app${product.images[0]}`) :
                       'https://via.placeholder.com/600x400?text=No+Image'}
                   alt={product.title}
                   className="absolute h-full w-full object-cover"
@@ -255,7 +255,7 @@ const ProductDetails = ({ user }) => {
                   >
                     <div className="relative pb-[75%]">
                       <img
-                        src={image.startsWith('http') ? image : `http://localhost:5000${image}`}
+                        src={image.startsWith('http') ? image : `https://campuscyclenew-production.up.railway.app${image}`}
                         alt={`${product.title} - view ${index + 1}`}
                         className="absolute h-full w-full object-cover"
                         onError={(e) => {
@@ -449,7 +449,7 @@ const ProductDetails = ({ user }) => {
                     <div className="relative h-48">
                       <img
                         src={item.images?.[0] ? 
-                          (item.images[0].startsWith('http') ? item.images[0] : `http://localhost:5000${item.images[0]}`) : 
+                          (item.images[0].startsWith('http') ? item.images[0] : `https://campuscyclenew-production.up.railway.app${item.images[0]}`) : 
                           'https://via.placeholder.com/300x200?text=No+Image'}
                         alt={item.title}
                         className="w-full h-full object-cover"

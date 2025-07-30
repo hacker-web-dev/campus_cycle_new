@@ -321,6 +321,27 @@ class ApiService {
     return this.makeRequest('/chatbot/history');
   }
 
+  // Analytics endpoints
+  async getSalesOverTime(period = 'month') {
+    return this.makeRequest(`/analytics/sales-over-time?period=${period}`);
+  }
+
+  async getViewsOverTime(period = 'month') {
+    return this.makeRequest(`/analytics/views-over-time?period=${period}`);
+  }
+
+  async getCategoryPerformance() {
+    return this.makeRequest('/analytics/category-performance');
+  }
+
+  async getListingPerformance() {
+    return this.makeRequest('/analytics/listing-performance');
+  }
+
+  async getEngagementMetrics() {
+    return this.makeRequest('/analytics/engagement');
+  }
+
 }
 
 export default new ApiService();

@@ -1465,6 +1465,316 @@ const awardPoints = async (userId, amount, reason, orderId = null) => {
 };
 
 // ======================
+// ANALYTICS API
+// ======================
+
+// Get sales analytics over time
+app.get('/api/analytics/sales-over-time', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { period = 'month' } = req.query; // month, week, day
+    
+    let groupBy;
+    let dateRange;
+    
+    switch (period) {
+      case 'week':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          week: { $week: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000); // 12 weeks
+        break;
+      case 'day':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+          day: { $dayOfMonth: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days
+        break;
+      default: // month
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 12 * 30 * 24 * 60 * 60 * 1000); // 12 months
+    }
+
+    const salesData = await Order.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+          paymentStatus: 'completed',
+          createdAt: { $gte: dateRange }
+        }
+      },
+      {
+        $group: {
+          _id: groupBy,
+          totalSales: { $sum: '$totalAmount' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.day': 1 }
+      }
+    ]);
+
+    res.json(salesData);
+  } catch (error) {
+    console.error('Sales analytics error:', error);
+    res.status(500).json({ message: 'Server error fetching sales analytics' });
+  }
+});
+
+// Get views analytics over time
+app.get('/api/analytics/views-over-time', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { period = 'month' } = req.query;
+    
+    let groupBy;
+    let dateRange;
+    
+    switch (period) {
+      case 'week':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          week: { $week: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'day':
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+          day: { $dayOfMonth: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        groupBy = {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' }
+        };
+        dateRange = new Date(Date.now() - 12 * 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const viewsData = await Item.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: dateRange }
+        }
+      },
+      {
+        $group: {
+          _id: groupBy,
+          totalViews: { $sum: '$views' },
+          itemCount: { $sum: 1 },
+          avgViews: { $avg: '$views' }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1, '_id.day': 1 }
+      }
+    ]);
+
+    res.json(viewsData);
+  } catch (error) {
+    console.error('Views analytics error:', error);
+    res.status(500).json({ message: 'Server error fetching views analytics' });
+  }
+});
+
+// Get category performance analytics
+app.get('/api/analytics/category-performance', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const categoryData = await Item.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId)
+        }
+      },
+      {
+        $group: {
+          _id: '$category',
+          totalItems: { $sum: 1 },
+          totalViews: { $sum: '$views' },
+          avgPrice: { $avg: '$price' },
+          activeItems: {
+            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+          },
+          soldItems: {
+            $sum: { $cond: [{ $eq: ['$status', 'sold'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $sort: { totalViews: -1 }
+      }
+    ]);
+
+    // Get sales data for each category
+    const salesByCategory = await Order.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+          paymentStatus: 'completed'
+        }
+      },
+      {
+        $unwind: '$items'
+      },
+      {
+        $lookup: {
+          from: 'items',
+          localField: 'items.item',
+          foreignField: '_id',
+          as: 'itemDetails'
+        }
+      },
+      {
+        $unwind: '$itemDetails'
+      },
+      {
+        $group: {
+          _id: '$itemDetails.category',
+          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          totalSold: { $sum: '$items.quantity' }
+        }
+      }
+    ]);
+
+    // Merge the data
+    const mergedData = categoryData.map(cat => {
+      const salesData = salesByCategory.find(sale => sale._id === cat._id);
+      return {
+        ...cat,
+        totalRevenue: salesData?.totalRevenue || 0,
+        totalSold: salesData?.totalSold || 0
+      };
+    });
+
+    res.json(mergedData);
+  } catch (error) {
+    console.error('Category performance error:', error);
+    res.status(500).json({ message: 'Server error fetching category performance' });
+  }
+});
+
+// Get listing performance over time
+app.get('/api/analytics/listing-performance', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const listingData = await Item.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId)
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          itemsListed: { $sum: 1 },
+          totalViews: { $sum: '$views' },
+          avgPrice: { $avg: '$price' }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 }
+      }
+    ]);
+
+    res.json(listingData);
+  } catch (error) {
+    console.error('Listing performance error:', error);
+    res.status(500).json({ message: 'Server error fetching listing performance' });
+  }
+});
+
+// Get user engagement metrics
+app.get('/api/analytics/engagement', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get favorite metrics
+    const favoriteStats = await Item.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId)
+        }
+      },
+      {
+        $project: {
+          title: 1,
+          views: 1,
+          favoriteCount: { $size: '$savedBy' },
+          category: 1,
+          price: 1,
+          createdAt: 1
+        }
+      },
+      {
+        $sort: { favoriteCount: -1 }
+      },
+      {
+        $limit: 10
+      }
+    ]);
+
+    // Get top performing items
+    const topItems = await Item.find({ 
+      seller: userId 
+    })
+    .sort({ views: -1 })
+    .limit(5)
+    .select('title views price category createdAt');
+
+    // Get recent engagement trends
+    const engagementTrend = await Item.aggregate([
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          totalViews: { $sum: '$views' },
+          totalFavorites: { $sum: { $size: '$savedBy' } },
+          itemCount: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+      }
+    ]);
+
+    res.json({
+      favoriteStats,
+      topItems,
+      engagementTrend
+    });
+  } catch (error) {
+    console.error('Engagement analytics error:', error);
+    res.status(500).json({ message: 'Server error fetching engagement analytics' });
+  }
+});
+
+// ======================
 // CHATBOT API
 // ======================
 

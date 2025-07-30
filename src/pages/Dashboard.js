@@ -2,6 +2,31 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaPlus, FaBoxOpen, FaHeart, FaShoppingBag, FaChartLine, FaEdit, FaTrash, FaEye, FaDollarSign, FaUsers, FaFire, FaClock, FaArrowUp, FaArrowDown, FaCopy } from 'react-icons/fa';
 import ApiService from '../services/api';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
@@ -10,6 +35,17 @@ const Dashboard = ({ user }) => {
   const [trendingItems, setTrendingItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Analytics data
+  const [analyticsData, setAnalyticsData] = useState({
+    salesOverTime: [],
+    viewsOverTime: [],
+    categoryPerformance: [],
+    listingPerformance: [],
+    engagement: null
+  });
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [timePeriod, setTimePeriod] = useState('month');
 
   useEffect(() => {
     // Check if user is authenticated
@@ -43,6 +79,40 @@ const Dashboard = ({ user }) => {
     fetchDashboardData();
   }, [navigate]);
 
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      const token = localStorage.getItem('campus_cycle_token');
+      if (!token) return;
+
+      try {
+        setAnalyticsLoading(true);
+        
+        const [salesData, viewsData, categoryData, listingData, engagementData] = await Promise.all([
+          ApiService.getSalesOverTime(timePeriod),
+          ApiService.getViewsOverTime(timePeriod),
+          ApiService.getCategoryPerformance(),
+          ApiService.getListingPerformance(),
+          ApiService.getEngagementMetrics()
+        ]);
+
+        setAnalyticsData({
+          salesOverTime: salesData || [],
+          viewsOverTime: viewsData || [],
+          categoryPerformance: categoryData || [],
+          listingPerformance: listingData || [],
+          engagement: engagementData || null
+        });
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, [timePeriod]);
+
   const copyPinToClipboard = async (pin) => {
     try {
       await navigator.clipboard.writeText(pin);
@@ -62,6 +132,92 @@ const Dashboard = ({ user }) => {
       }
       document.body.removeChild(textArea);
     }
+  };
+
+  // Chart data preparation functions
+  const prepareSalesChartData = () => {
+    if (!analyticsData.salesOverTime.length) return null;
+    
+    const labels = analyticsData.salesOverTime.map(item => {
+      if (item._id.day) {
+        return `${item._id.month}/${item._id.day}`;
+      } else if (item._id.week) {
+        return `Week ${item._id.week}`;
+      } else {
+        return `${item._id.month}/${item._id.year}`;
+      }
+    });
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Sales ($)',
+          data: analyticsData.salesOverTime.map(item => item.totalSales),
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          fill: true,
+          tension: 0.4,
+        },
+        {
+          label: 'Orders',
+          data: analyticsData.salesOverTime.map(item => item.orderCount),
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y1',
+        }
+      ]
+    };
+  };
+
+  const prepareViewsChartData = () => {
+    if (!analyticsData.viewsOverTime.length) return null;
+    
+    const labels = analyticsData.viewsOverTime.map(item => {
+      if (item._id.day) {
+        return `${item._id.month}/${item._id.day}`;
+      } else if (item._id.week) {
+        return `Week ${item._id.week}`;
+      } else {
+        return `${item._id.month}/${item._id.year}`;
+      }
+    });
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Total Views',
+          data: analyticsData.viewsOverTime.map(item => item.totalViews),
+          backgroundColor: 'rgba(147, 51, 234, 0.8)',
+          borderColor: 'rgb(147, 51, 234)',
+          borderWidth: 1,
+        }
+      ]
+    };
+  };
+
+  const prepareCategoryChartData = () => {
+    if (!analyticsData.categoryPerformance.length) return null;
+    
+    const colors = [
+      '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
+      '#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'
+    ];
+    
+    return {
+      labels: analyticsData.categoryPerformance.map(item => item._id),
+      datasets: [
+        {
+          label: 'Revenue ($)',
+          data: analyticsData.categoryPerformance.map(item => item.totalRevenue),
+          backgroundColor: colors.slice(0, analyticsData.categoryPerformance.length),
+          borderWidth: 1,
+        }
+      ]
+    };
   };
 
   const StatCard = ({ title, value, change, icon, color, link }) => (
@@ -263,15 +419,179 @@ const Dashboard = ({ user }) => {
               />
             </div>
 
-            {/* Performance Chart Placeholder */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Your Performance</h3>
-              <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <FaChartLine className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">Performance analytics coming soon</p>
+            {/* Performance Analytics Dashboard */}
+            <div className="space-y-6">
+              {/* Time Period Selector */}
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium text-gray-900">Performance Analytics</h3>
+                  <div className="flex space-x-2">
+                    {['day', 'week', 'month'].map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setTimePeriod(period)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                          timePeriod === period
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {period.charAt(0).toUpperCase() + period.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {analyticsLoading ? (
+                <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">Loading analytics...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Sales Over Time Chart */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">Sales & Orders Over Time</h4>
+                    {prepareSalesChartData() ? (
+                      <div className="h-64">
+                        <Line
+                          data={prepareSalesChartData()}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'top',
+                              },
+                            },
+                            scales: {
+                              y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                  display: true,
+                                  text: 'Sales ($)'
+                                }
+                              },
+                              y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                  display: true,
+                                  text: 'Orders'
+                                },
+                                grid: {
+                                  drawOnChartArea: false,
+                                },
+                              },
+                            },
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-gray-500">
+                        No sales data available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Views Over Time Chart */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">Views Over Time</h4>
+                    {prepareViewsChartData() ? (
+                      <div className="h-64">
+                        <Bar
+                          data={prepareViewsChartData()}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'top',
+                              },
+                            },
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                title: {
+                                  display: true,
+                                  text: 'Views'
+                                }
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-gray-500">
+                        No views data available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Category Performance Chart */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">Revenue by Category</h4>
+                    {prepareCategoryChartData() ? (
+                      <div className="h-64">
+                        <Doughnut
+                          data={prepareCategoryChartData()}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'right',
+                                labels: {
+                                  boxWidth: 12,
+                                  padding: 15
+                                }
+                              },
+                            },
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-gray-500">
+                        No category data available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Top Performing Items */}
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">Top Performing Items</h4>
+                    {analyticsData.engagement?.topItems?.length > 0 ? (
+                      <div className="space-y-3">
+                        {analyticsData.engagement.topItems.map((item, index) => (
+                          <div key={item._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <span className="text-sm font-bold text-gray-500 mr-3">#{index + 1}</span>
+                                <div>
+                                  <p className="font-medium text-gray-900 truncate">{item.title}</p>
+                                  <p className="text-sm text-gray-500">{item.category}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-blue-600">{item.views} views</p>
+                              <p className="text-sm text-gray-500">${item.price}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-gray-500">
+                        No performance data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

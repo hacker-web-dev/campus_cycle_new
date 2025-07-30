@@ -249,7 +249,7 @@ const SmartRecommendations = ({ user }) => {
                 <Link to={`/product/${item._id}`}>
                   <img
                     src={item.images?.[0] ? 
-                      (item.images[0].startsWith('http') ? item.images[0] : `http://localhost:5000${item.images[0]}`) : 
+                      (item.images[0].startsWith('http') ? item.images[0] : `https://campuscyclenew-production.up.railway.app${item.images[0]}`) : 
                       'https://via.placeholder.com/300x200?text=No+Image'}
                     alt={item.title}
                     className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
